@@ -1,4 +1,3 @@
 # Bird-Is-The-Word
-ML model for bird bracelet detection, localization and transcription.
+ML model for bird ring detection, localization and transcription.
 
-test123
