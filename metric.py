@@ -27,7 +27,7 @@ The calculation is weighted so that the wrong codes are penalized more than miss
 """
 def weighted_f1(predicted, target, n_classes):
 
-    # TODO: Make sure One-hot encoding is correct for use case
+    # TODO: Make sure One-hot encoding is formatted correctly
     # One-Hot encode the parameters
     predicted = torch.nn.functional.one_hot(predicted, n_classes)
     target = torch.nn.functional.one_hot(target, n_classes)
