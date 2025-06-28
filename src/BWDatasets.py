@@ -37,6 +37,38 @@ class TrainDataSet(Dataset):
             image = tensor_to_numpy(image) # Image must be a numpy array
         
         return image, label
+    
+class InferenceDataSet(Dataset):
+    def __init__(self, img_path:str, boundingbox_path:str, transform=None, max_n=None):
+        self.img_path = img_path
+        self.transform = transform
+        self.max_n = max_n
+
+        # Retrieve labels and sort them in alphabetical order to match the images
+        df = pd.read_csv(boundingbox_path, sep="|")
+        df = df.sort_values("filename", ascending=True).reset_index(drop=True)
+
+        # Ensure the data contains the chosen amount of elements
+        if max_n is not None:
+            df = df[:self.max_n]
+        
+        # Retrieve images from folder and match them with labels
+        self.img_paths = df["filename"].apply(lambda e: os.path.join(img_path, e)).to_list()
+
+        self.labels = list(df[["code","color"]].itertuples(index=False, name=None)) # Labels should be a list of tuples
+        
+    def __len__(self):
+        return len(self.img_paths)
+
+    def __getitem__(self, idx):
+        label = self.labels[idx]
+        image = Image.open(self.img_paths[idx]).convert('RGB')
+
+        if self.transform: # Add transformation mask to image
+            image = self.transform(image)
+            image = tensor_to_numpy(image) # Image must be a numpy array
+        
+        return image, label
 
 # Helper function
 def tensor_to_numpy(img_tensor):
