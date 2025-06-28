@@ -34,7 +34,7 @@ class TrainDataSet(Dataset):
 
         if self.transform: # Add transformation mask to image
             image = self.transform(image)
-            image = tensor_to_numpy(image) # Image must be a numpy array
+            # image = tensor_to_numpy(image) # Image must be a numpy array
         
         return image, label
     
@@ -73,10 +73,15 @@ class InferenceDataSet(Dataset):
 # Helper function
 def tensor_to_numpy(img_tensor):
     img_np = img_tensor.detach().cpu()
-    # img_np = img_np.permute(0, 2, 3, 1).numpy()
-    img_np = img_np.permute(1, 2, 0).numpy()
-    #img_np= (img_np* 255).clip(0, 255).astype('uint8')
-    return img_np
+    
+    if img_tensor.dim() == 4:
+        return img_np.permute(0, 3, 2, 1).numpy()
+    
+    if img_tensor.dim() == 3:
+        return img_np.permute(1, 2, 0).numpy()
+    # #img_np= (img_np* 255).clip(0, 255).astype('uint8')
+    return img_np.numpy()
+    
 
 def open_image(filepath):
     image = Image.open(filepath).convert('RGB')
@@ -96,3 +101,12 @@ if __name__ == "__main__":
     train_dataset = TrainDataSet(img_path=image_path, labels_path=label_path, transform=transform, max_n=max_n)
 
     exp_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True)
+
+    for images, labels in exp_loader:
+        print(images.shape)
+        images = tensor_to_numpy(images)
+        print(images.shape)
+        for image in images:
+            print(image.shape)
+
+
