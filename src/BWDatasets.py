@@ -36,6 +36,9 @@ class TrainDataSet(Dataset):
             image = self.transform(image)
             # image = tensor_to_numpy(image) # Image must be a numpy array
         
+        if  not (isinstance(image, torch.Tensor)):
+            image = T.ToTensor()(image)
+
         return image, label
     
 class InferenceDataSet(Dataset):
