@@ -1,6 +1,7 @@
 import torch
 import numpy
 from torch.utils.data import Dataset, DataLoader 
+from torchvision.transforms import functional as F
 import torchvision.transforms as T
 import pandas as pd
 from PIL import Image
@@ -47,6 +48,7 @@ class TrainDataSet(Dataset):
             image = T.ToTensor()(image)
 
         bb = _calculate_bb_cords(image=image, bb=_bb_txt_to_list(bb_path=bb_path)) # Retrieve bb cords directly before returning
+        image = _crop_image_with_bb(image, bb)
         return image, bb, label
     
 '''
@@ -75,6 +77,20 @@ def open_image(filepath):
     image = func(image)
     image = tensor_to_numpy(image)
     return image
+
+'''
+Crops an image to the bounding box that is provided
+-------- Helper function --------
+'''
+def _crop_image_with_bb(image, bb):
+    x = int(bb[0])
+    y = int(bb[1])
+    width = int(bb[2]) - int(bb[0])
+    height = int(bb[3]) - int(bb[1])
+
+    img_crop = F.crop(image, top=y, left=x, height=height, width=width)
+    return img_crop
+
 
 '''
 Converts a txt file containing the bounding boxes to a ring
