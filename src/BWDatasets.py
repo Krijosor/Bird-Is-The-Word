@@ -7,7 +7,7 @@ from PIL import Image
 import os
 
 class TrainDataSet(Dataset):
-    def __init__(self, img_path:str, labels_path:str, transform=None, max_n=None):
+    def __init__(self, img_path:str, labels_path:str, bb_path: str, transform=None, max_n=None):
         self.img_path = img_path
         self.transform = transform
         self.max_n = max_n
@@ -23,6 +23,12 @@ class TrainDataSet(Dataset):
         # Retrieve images from folder and match them with labels
         self.img_paths = df["filename"].apply(lambda e: os.path.join(img_path, e)).to_list()
 
+        bb_path = bb_path + "/"
+
+        bb_paths = df["filename"].apply(lambda e: os.path.join(bb_path, e)).to_list()
+
+        self.bb_paths = [i[:-4] + ".txt" for i in bb_paths]
+
         self.labels = list(df[["code","color"]].itertuples(index=False, name=None)) # Labels should be a list of tuples
         
     def __len__(self):
@@ -30,62 +36,34 @@ class TrainDataSet(Dataset):
 
     def __getitem__(self, idx):
         label = self.labels[idx]
+        bb_path = self.bb_paths[idx]
+        
         image = Image.open(self.img_paths[idx]).convert('RGB')
 
         if self.transform: # Add transformation mask to image
             image = self.transform(image)
-            # image = tensor_to_numpy(image) # Image must be a numpy array
         
+        # Make sure that the returned image is a tensor, and not PIL
         if  not (isinstance(image, torch.Tensor)):
             image = T.ToTensor()(image)
 
-        return image, label
+        bb = calculate_bb_cords(image=image, bb=bb_txt_to_list(bb_path=bb_path))
+        return image, bb, label
     
-class InferenceDataSet(Dataset):
-    def __init__(self, img_path:str, boundingbox_path:str, transform=None, max_n=None):
-        self.img_path = img_path
-        self.transform = transform
-        self.max_n = max_n
-
-        # Retrieve labels and sort them in alphabetical order to match the images
-        df = pd.read_csv(boundingbox_path, sep="|")
-        df = df.sort_values("filename", ascending=True).reset_index(drop=True)
-
-        # Ensure the data contains the chosen amount of elements
-        if max_n is not None:
-            df = df[:self.max_n]
-        
-        # Retrieve images from folder and match them with labels
-        self.img_paths = df["filename"].apply(lambda e: os.path.join(img_path, e)).to_list()
-
-        self.labels = list(df[["code","color"]].itertuples(index=False, name=None)) # Labels should be a list of tuples
-        
-    def __len__(self):
-        return len(self.img_paths)
-
-    def __getitem__(self, idx):
-        label = self.labels[idx]
-        image = Image.open(self.img_paths[idx]).convert('RGB')
-
-        if self.transform: # Add transformation mask to image
-            image = self.transform(image)
-            image = tensor_to_numpy(image) # Image must be a numpy array
-        
-        return image, label
-
 # Helper function
 def tensor_to_numpy(img_tensor):
     img_np = img_tensor.detach().cpu()
     
-    if img_tensor.dim() == 4:
+    # Make sure dimensionality is taken into account when permuting image dimensions
+    if img_tensor.dim() == 4: # For batches
         return img_np.permute(0, 3, 2, 1).numpy()
     
-    if img_tensor.dim() == 3:
+    if img_tensor.dim() == 3: # For single images
         return img_np.permute(1, 2, 0).numpy()
-    # #img_np= (img_np* 255).clip(0, 255).astype('uint8')
+    
     return img_np.numpy()
     
-
+# Helper function
 def open_image(filepath):
     image = Image.open(filepath).convert('RGB')
     func = T.PILToTensor()
@@ -93,15 +71,48 @@ def open_image(filepath):
     image = tensor_to_numpy(image)
     return image
 
+# Helper function
+def bb_txt_to_list(bb_path):
+    
+    with open(bb_path) as f:
+        line = f.readline().strip()
+
+        bb = line.split(' ')
+    
+    return bb
+
+# Helper function
+def calculate_bb_cords(image, bb):
+
+    img_w = image.shape[2]
+    img_h = image.shape[1]
+
+    # Calculate x and y coordinates of the bb
+    bb_x = img_w * float(bb[1])
+    bb_y = img_h * float(bb[2])
+
+    # Calculate height and width of the bb, and divide by 2
+    bb_w = (image.shape[2] * float(bb[3])) / 2
+    bb_h = (image.shape[1] * float(bb[4])) / 2
+
+    # Calculate corners of bb
+    min_x = max(0, bb_x - (bb_w))
+    max_x = min(img_w, bb_x + (bb_w))
+    min_y = max(0, bb_y - (bb_h))
+    max_y = min(img_h, bb_y + (bb_h))
+
+    return min_x, min_y, max_x, max_y
+
 if __name__ == "__main__":
     label_path = "dataset/datasets/rf/ringcodes.csv"
     image_path = "dataset/datasets/rf/images"
+    bb_path = "dataset/datasets/rf/labels"
     max_n = 10
     transform = T.Compose([
         #T.Resize((224,224)),
         T.ToTensor()
     ])
-    train_dataset = TrainDataSet(img_path=image_path, labels_path=label_path, transform=transform, max_n=max_n)
+    train_dataset = TrainDataSet(img_path=image_path, labels_path=label_path, bb_path=bb_path, transform=transform, max_n=max_n)
 
     exp_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True)
 
