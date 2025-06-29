@@ -37,7 +37,6 @@ class TrainDataSet(Dataset):
     def __getitem__(self, idx):
         label = self.labels[idx]
         bb_path = self.bb_paths[idx]
-        
         image = Image.open(self.img_paths[idx]).convert('RGB')
 
         if self.transform: # Add transformation mask to image
@@ -47,11 +46,14 @@ class TrainDataSet(Dataset):
         if  not (isinstance(image, torch.Tensor)):
             image = T.ToTensor()(image)
 
-        bb = calculate_bb_cords(image=image, bb=bb_txt_to_list(bb_path=bb_path))
+        bb = _calculate_bb_cords(image=image, bb=_bb_txt_to_list(bb_path=bb_path)) # Retrieve bb cords directly before returning
         return image, bb, label
     
-# Helper function
-def tensor_to_numpy(img_tensor):
+'''
+Converts a tensor containing a PIL image into a numpy array.
+The PaddleOCR model only takes in a numpy array so the image must be converted into one first.
+'''
+def tensor_to_numpy(img_tensor:torch.Tensor):
     img_np = img_tensor.detach().cpu()
     
     # Make sure dimensionality is taken into account when permuting image dimensions
@@ -63,7 +65,10 @@ def tensor_to_numpy(img_tensor):
     
     return img_np.numpy()
     
-# Helper function
+'''
+Opens a single image so that it can easily be converted into
+a format that can go into the PaddleOCR model
+'''
 def open_image(filepath):
     image = Image.open(filepath).convert('RGB')
     func = T.PILToTensor()
@@ -71,18 +76,26 @@ def open_image(filepath):
     image = tensor_to_numpy(image)
     return image
 
-# Helper function
-def bb_txt_to_list(bb_path):
-    
+'''
+Converts a txt file containing the bounding boxes to a ring
+@param bb_path - The file path leading to a txt file containing the bounding boxes
+-------- Helper Function --------
+'''
+def _bb_txt_to_list(bb_path):
+
     with open(bb_path) as f:
         line = f.readline().strip()
-
         bb = line.split(' ')
     
     return bb
 
-# Helper function
-def calculate_bb_cords(image, bb):
+'''
+Calculates the Bounding box coordinates for an image
+@param image - the image's dimensions is needed for box calculations
+@param bb - the bounding box has the following: [x_middle, y_middle, width, height]
+-------- Helper Function --------
+'''
+def _calculate_bb_cords(image, bb):
 
     img_w = image.shape[2]
     img_h = image.shape[1]
@@ -103,6 +116,11 @@ def calculate_bb_cords(image, bb):
 
     return min_x, min_y, max_x, max_y
 
+'''
+Main function for file
+Used for testing
+
+'''
 if __name__ == "__main__":
     label_path = "dataset/datasets/rf/ringcodes.csv"
     image_path = "dataset/datasets/rf/images"
