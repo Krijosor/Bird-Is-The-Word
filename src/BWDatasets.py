@@ -40,15 +40,16 @@ class TrainDataSet(Dataset):
         bb_path = self.bb_paths[idx]
         image = Image.open(self.img_paths[idx]).convert('RGB')
 
-        if self.transform: # Add transformation mask to image
-            image = self.transform(image)
-        
         # Make sure that the returned image is a tensor, and not PIL
         if  not (isinstance(image, torch.Tensor)):
             image = T.ToTensor()(image)
-
+        
         bb = _calculate_bb_cords(image=image, bb=_bb_txt_to_list(bb_path=bb_path)) # Retrieve bb cords directly before returning
         image = _crop_image_with_bb(image, bb)
+
+        if self.transform: # Add transformation mask to image
+            image = self.transform(image)
+            
         return image, bb, label
     
 '''
