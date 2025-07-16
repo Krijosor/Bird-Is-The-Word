@@ -6,12 +6,24 @@ import torchvision.transforms as T
 import pandas as pd
 from PIL import Image
 import os
+import cv2
+import cv2.dnn_superres
 
+'''
+Images that go into dataset are retrieved from the given folder and converted to PIL images. 
+These are then converted to tensors.
+Then cropped by the Bounding Box coordinates.
+Then image is upsampled using opencv2's superresolution module EDSR_x4
+Then transform is applied.
+'''
 class TrainDataSet(Dataset):
     def __init__(self, img_path:str, labels_path:str, bb_path: str, transform=None, max_n=None):
         self.img_path = img_path
         self.transform = transform
         self.max_n = max_n
+        self.upres = cv2.dnn_superres.DnnSuperResImpl.create()
+        self.upres.readModel('src/upsampling/EDSR_x4.pb')
+        self.upres.setModel('edsr', 4)
 
         # Retrieve labels and sort them in alphabetical order to match the images
         df = pd.read_csv(labels_path, sep="|")
@@ -41,14 +53,22 @@ class TrainDataSet(Dataset):
         image = Image.open(self.img_paths[idx]).convert('RGB')
 
         # Make sure that the returned image is a tensor, and not PIL
-        if  not (isinstance(image, torch.Tensor)):
+        if not (isinstance(image, torch.Tensor)):
             image = T.ToTensor()(image)
         
         bb = _calculate_bb_cords(image=image, bb=_bb_txt_to_list(bb_path=bb_path)) # Retrieve bb cords directly before returning
         image = _crop_image_with_bb(image, bb)
 
-        if self.transform: # Add transformation mask to image
+        image = tensor_to_numpy(image) # CV2 requires numpy
+        image = self.upres.upsample(image)
+
+        # Add transformation mask to image
+        if self.transform:
             image = self.transform(image)
+
+        # Make sure that the returned image is a tensor
+        if not (isinstance(image, torch.Tensor)):
+            image = T.ToTensor()(image)
             
         return image, bb, label
     
