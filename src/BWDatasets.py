@@ -64,10 +64,10 @@ class TrainDataSet(Dataset):
         # OpenCV model requires Integers and will truncate our floats, so we convert them safely with this function
         image = convert_dtype(image)
 
-        image = self.upres.upsample(image)
+        #image = self.upres.upsample(image)
 
         # Convert values back to floats
-        image = convert_dtype(image)
+        #image = convert_dtype(image)
 
         # Make sure that the image is a tensor
         if not (isinstance(image, torch.Tensor)):
@@ -88,7 +88,7 @@ We set copy = False since we won't use the pre-manipulated image again.
 '''
 def convert_dtype(image):
     
-    if image.dtype.name == 'int8':
+    if image.dtype.name == 'uint8':
         image = image.astype(np.float32, copy=False) / 255.0
         image[image > 1.0] = 1.0
         image[image < 0.0] = 0.0
@@ -110,7 +110,7 @@ def tensor_to_numpy(img_tensor:torch.Tensor):
     
     # Make sure dimensionality is taken into account when permuting image dimensions
     if img_tensor.dim() == 4: # For batches
-        return img_np.permute(0, 3, 2, 1).numpy()
+        return img_np.permute(0, 2, 3, 1).numpy()
     
     if img_tensor.dim() == 3: # For single images
         return img_np.permute(1, 2, 0).numpy()
