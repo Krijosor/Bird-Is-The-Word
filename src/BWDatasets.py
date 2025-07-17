@@ -1,5 +1,5 @@
 import torch
-import numpy
+import numpy as np
 from torch.utils.data import Dataset, DataLoader 
 from torchvision.transforms import functional as F
 import torchvision.transforms as T
@@ -52,7 +52,7 @@ class TrainDataSet(Dataset):
         bb_path = self.bb_paths[idx]
         image = Image.open(self.img_paths[idx]).convert('RGB')
 
-        # Make sure that the returned image is a tensor, and not PIL
+        # Make sure that the image is a tensor, and not PIL
         if not (isinstance(image, torch.Tensor)):
             image = T.ToTensor()(image)
         
@@ -60,18 +60,47 @@ class TrainDataSet(Dataset):
         image = _crop_image_with_bb(image, bb)
 
         image = tensor_to_numpy(image) # CV2 requires numpy
+
+        # OpenCV model requires Integers and will truncate our floats, so we convert them safely with this function
+        image = convert_dtype(image)
+
         image = self.upres.upsample(image)
+
+        # Convert values back to floats
+        image = convert_dtype(image)
+
+        # Make sure that the image is a tensor
+        if not (isinstance(image, torch.Tensor)):
+            image = T.ToTensor()(image)
 
         # Add transformation mask to image
         if self.transform:
             image = self.transform(image)
 
-        # Make sure that the returned image is a tensor
-        if not (isinstance(image, torch.Tensor)):
-            image = T.ToTensor()(image)
-            
         return image, bb, label
+
+'''
+Converts the image from float values to integer values 
+or from integer to float values,
+depending on what type the image currently has.
+
+We set copy = False since we won't use the pre-manipulated image again.
+'''
+def convert_dtype(image):
     
+    if image.dtype.name == 'int8':
+        image = image.astype(np.float32, copy=False) / 255.0
+        image[image > 1.0] = 1.0
+        image[image < 0.0] = 0.0
+
+    elif image.dtype.name == 'float32':
+        image *= 255
+        image = image.astype(np.uint8, copy=False)
+        image[image> 255] = 255
+        image[image < 0] = 0
+
+    return image
+
 '''
 Converts a tensor containing a PIL image into a numpy array.
 The PaddleOCR model only takes in a numpy array so the image must be converted into one first.
@@ -152,6 +181,17 @@ def _calculate_bb_cords(image, bb):
     max_y = min(img_h, bb_y + (bb_h))
 
     return min_x, min_y, max_x, max_y
+
+'''
+Used to check the state of an image during the retrieval
+'''
+def check_image_state(img, state):
+    print("-"*12)
+    print(f'Checking image at state: {state}')
+    print(f'Is image None: {img is None}')
+    print(f'Shape: {img.shape}, Pixel Datatype: {img.dtype}')
+    print(f'Min Value: {img.min()}, Max Value: {img.max()}')
+    print("-"*12)
 
 '''
 Main function for file
