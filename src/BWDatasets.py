@@ -59,15 +59,20 @@ class TrainDataSet(Dataset):
         bb = _calculate_bb_cords(image=image, bb=_bb_txt_to_list(bb_path=bb_path)) # Retrieve bb cords directly before returning
         image = _crop_image_with_bb(image, bb)
 
+        # T.Normalize(           # ImageNet stats
+        #     mean=[0.485, 0.456, 0.406],
+        #     std=[0.229, 0.224, 0.225],
+        # )(image)
+
         image = tensor_to_numpy(image) # CV2 requires numpy
 
-        # OpenCV model requires Integers and will truncate our floats, so we convert them safely with this function
-        image = convert_dtype(image)
+        # Convert image to integers
+        image = (image * 255).clip(0, 255).astype('uint8')
 
-        #image = self.upres.upsample(image)
-
-        # Convert values back to floats
-        #image = convert_dtype(image)
+        # Convert image to OpenCV BGR format, supersample, and convert back to RGB 
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        image = self.upres.upsample(image)
+        #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         # Make sure that the image is a tensor
         if not (isinstance(image, torch.Tensor)):
