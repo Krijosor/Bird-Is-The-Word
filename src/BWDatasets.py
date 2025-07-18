@@ -84,8 +84,6 @@ class TrainDataSet(Dataset):
         # TODO: Morphological cleanup -> fyll inn manglende deler av bokstaver og fjern flekker
 
         
-
-
         # TODO: Data augmentation
 
         # Make sure that the image is a tensor
@@ -99,7 +97,7 @@ class TrainDataSet(Dataset):
         # Convert image back to ints
         image = convert_dtype(image)
 
-        check_image_state(image, "after all steps")
+        #check_image_state(image, "after all steps")
         return image, bb, label
 
 '''
