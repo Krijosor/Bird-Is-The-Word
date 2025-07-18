@@ -57,10 +57,10 @@ class TrainDataSet(Dataset):
         bb = _calculate_bb_cords(image=image, bb=_bb_txt_to_list(bb_path=bb_path)) # Retrieve bb cords directly before returning
         image = _crop_image_with_bb(image, bb)
 
-        # T.Normalize(           # ImageNet stats
-        #     mean=[0.485, 0.456, 0.406],
-        #     std=[0.229, 0.224, 0.225],
-        # )(image)
+        image = T.Normalize(           # ImageNet stats
+            mean=[0.485, 0.456, 0.406],
+            std=[0.229, 0.224, 0.225],
+        )(image)
 
         # Cast to numpy and change to integers
         image = tensor_to_numpy(image)
@@ -71,6 +71,23 @@ class TrainDataSet(Dataset):
         image = self.upres.upsample(image)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
+        # TODO: Deskew bildet
+
+        # TODO: Grayscale bildet
+
+        # TODO: Noise reduction og sharpening -> bilateral filter beholder edges
+
+        # TODO: Contrast enhancement - CLAHE
+
+        # TODO: Binarize / threshold bildet -> en svart og hvit maske
+
+        # TODO: Morphological cleanup -> fyll inn manglende deler av bokstaver og fjern flekker
+
+        
+
+
+        # TODO: Data augmentation
+
         # Make sure that the image is a tensor
         if not (isinstance(image, torch.Tensor)):
             image = T.ToTensor()(image)
@@ -79,10 +96,10 @@ class TrainDataSet(Dataset):
         if self.transform:
             image = self.transform(image)
 
-        # Convert image back to 
+        # Convert image back to ints
         image = convert_dtype(image)
 
-        #check_image_state(image, "after all steps")
+        check_image_state(image, "after all steps")
         return image, bb, label
 
 '''
@@ -92,10 +109,8 @@ depending on what type the image currently has.
 
 We set copy = False since we won't use the pre-manipulated image again.
 '''
-def convert_dtype(image:torch.Tensor):
-    image = (image * 255).to(dtype=torch.uint8)
-    image[image> 255] = 255
-    image[image < 0] = 0
+def convert_dtype(image:torch.Tensor) -> torch.Tensor:
+    image = (image.clamp(0.0, 1.0) * 255).byte()
     return image
 
 # def convert_dtype(image:torch.Tensor):
