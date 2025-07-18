@@ -37,9 +37,7 @@ class TrainDataSet(Dataset):
         self.img_paths = df["filename"].apply(lambda e: os.path.join(img_path, e)).to_list()
 
         bb_path = bb_path + "/"
-
         bb_paths = df["filename"].apply(lambda e: os.path.join(bb_path, e)).to_list()
-
         self.bb_paths = [i[:-4] + ".txt" for i in bb_paths]
 
         self.labels = list(df[["code","color"]].itertuples(index=False, name=None)) # Labels should be a list of tuples
@@ -64,29 +62,27 @@ class TrainDataSet(Dataset):
         #     std=[0.229, 0.224, 0.225],
         # )(image)
 
-        image = tensor_to_numpy(image) # CV2 requires numpy
-
-        # Convert image to integers
+        # Cast to numpy and change to integers
+        image = tensor_to_numpy(image)
         image = (image * 255).clip(0, 255).astype('uint8')
 
         # Convert image to OpenCV BGR format, supersample, and convert back to RGB 
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
         image = self.upres.upsample(image)
-        #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         # Make sure that the image is a tensor
         if not (isinstance(image, torch.Tensor)):
             image = T.ToTensor()(image)
-            image = (image * 255).to(dtype=torch.uint8)
 
         # Add transformation mask to image
         if self.transform:
             image = self.transform(image)
 
-        # image = tensor_to_numpy(image)
-        # image = (image * 255).clip(0, 255).astype('uint8')
+        # Convert image back to 
+        image = convert_dtype(image)
 
-        check_image_state(image, "after all steps")
+        #check_image_state(image, "after all steps")
         return image, bb, label
 
 '''
@@ -96,20 +92,27 @@ depending on what type the image currently has.
 
 We set copy = False since we won't use the pre-manipulated image again.
 '''
-def convert_dtype(image):
-    
-    if image.dtype.name == 'uint8':
-        image = image.astype(np.float32, copy=False) / 255.0
-        image[image > 1.0] = 1.0
-        image[image < 0.0] = 0.0
-
-    elif image.dtype.name == 'float32':
-        image *= 255
-        image = image.astype(np.uint8, copy=False)
-        image[image> 255] = 255
-        image[image < 0] = 0
-
+def convert_dtype(image:torch.Tensor):
+    image = (image * 255).to(dtype=torch.uint8)
+    image[image> 255] = 255
+    image[image < 0] = 0
     return image
+
+# def convert_dtype(image:torch.Tensor):
+#     if image.dtype == 'uint8':
+#         # image = image.astype(np.float32, copy=False) / 255.0
+#         image = (image / 255).to(dtype=torch.float32)
+#         image[image > 1.0] = 1.0
+#         image[image < 0.0] = 0.0
+
+#     elif image.dtype == 'float32':
+#         # image *= 255
+#         # image = image.astype(np.uint8, copy=False)
+#         image = (image * 255).to(dtype=torch.uint8)
+#         image[image> 255] = 255
+#         image[image < 0] = 0
+
+#     return image
 
 '''
 Converts a tensor containing a PIL image into a numpy array.
@@ -135,6 +138,7 @@ def open_image(filepath):
     image = Image.open(filepath).convert('RGB')
     func = T.PILToTensor()
     image = func(image)
+    # TODO: Add preprocessing steps
     image = tensor_to_numpy(image)
     return image
 
@@ -212,7 +216,7 @@ if __name__ == "__main__":
     label_path = "dataset/datasets/rf/ringcodes.csv"
     image_path = "dataset/datasets/rf/images"
     bb_path = "dataset/datasets/rf/labels"
-    max_n = 10
+    max_n = 1
     WIDTH = 224
     HEIGHT = 224
 
