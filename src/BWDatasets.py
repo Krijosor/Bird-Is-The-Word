@@ -77,11 +77,16 @@ class TrainDataSet(Dataset):
         # Make sure that the image is a tensor
         if not (isinstance(image, torch.Tensor)):
             image = T.ToTensor()(image)
+            image = (image * 255).to(dtype=torch.uint8)
 
         # Add transformation mask to image
         if self.transform:
             image = self.transform(image)
 
+        # image = tensor_to_numpy(image)
+        # image = (image * 255).clip(0, 255).astype('uint8')
+
+        check_image_state(image, "after all steps")
         return image, bb, label
 
 '''
@@ -200,7 +205,7 @@ def check_image_state(img, state):
 
 '''
 Main function for file
-Used for testing
+Used for testing, mainly that the preprocessing steps keep the desired output format
 
 '''
 if __name__ == "__main__":
@@ -208,19 +213,30 @@ if __name__ == "__main__":
     image_path = "dataset/datasets/rf/images"
     bb_path = "dataset/datasets/rf/labels"
     max_n = 10
+    WIDTH = 224
+    HEIGHT = 224
+
     transform = T.Compose([
-        #T.Resize((224,224)),
-        T.ToTensor()
+        T.Resize((HEIGHT,WIDTH)),
+        T.Lambda(lambda x: F.rotate(x, 270, expand=True))
+        
     ])
+
     train_dataset = TrainDataSet(img_path=image_path, labels_path=label_path, bb_path=bb_path, transform=transform, max_n=max_n)
 
     exp_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True)
 
-    for images, labels in exp_loader:
-        print(images.shape)
+    for images, bb, labels in exp_loader:
         images = tensor_to_numpy(images)
-        print(images.shape)
         for image in images:
-            print(image.shape)
-
-
+            # Some simple tests
+            if image is None:
+                print("Image is None!")
+            elif image.dtype.name == 'float32':
+                print("Image is a float!")
+            elif image.min() < 0:
+                print("Image minimum value is lower than 0!")
+            elif image.max() <= 2:
+                print("Image maximum value is too low!")
+            else:
+                print("All Good!")
