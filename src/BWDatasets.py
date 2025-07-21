@@ -57,36 +57,54 @@ class TrainDataSet(Dataset):
         # Crop image
         bb = _calculate_bb_cords(image=image, bb=_bb_txt_to_list(bb_path=bb_path)) # Retrieve bb cords directly before returning
         image = _crop_image_with_bb(image, bb)
+        ocr_image = image.astype(np.uint8)
+    
+        # Convert image to OpenCV BGR format and upsample to gain more detail
+        # ocr_image = (ocr_image * 255).clip(0, 255).astype('uint8')
+        ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_RGB2BGR)
+        ocr_image = self.upres.upsample(ocr_image)
 
+        # Grayscaling
+        ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2GRAY)
+
+        # Noise reduction
+        ocr_image = cv2.bilateralFilter(ocr_image, 15, 50, 50)
+
+        # Contrast enhancement - CLAHE
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(20,20))
+        ocr_image = clahe.apply(ocr_image)
+
+        # TODO: Deskewing the image
+        # Denne må eg skrive selv visstnok :(
+        # edges = cv2.Canny(ocr_image, 50, 150)
+        # angle = calculate_angle(edges)
+        # M = cv2.getRotationMatrix2D(center, angle, 1.0)
+        # ocr_image = cv2.warpAffine(plate_roi, M, (width, height))
+
+        # TODO: Prøv contrast normalization her istedet for vanlig normalization 
+        # NOrmalisering burde egt være før grayscale, eller basert på bildet etter grayscale
         # Normalization with ImageNet mean and std
         ocr_image = image.astype(np.float32) / 255.0
         mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
         std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
         ocr_image = (ocr_image - mean) / std
-
-        # Cast to numpy and change to integers
-        # ocr_image = tensor_to_numpy(ocr_image)
-        # ocr_image = (ocr_image * 255).clip(0, 255).astype('uint8')
-
-        # Convert image to OpenCV BGR format, supersample, and convert back to RGB 
-        # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_RGB2BGR)
-        # ocr_image = self.upres.upsample(ocr_image)
+        ocr_image = (ocr_image * 255).clip(0, 255).astype('uint8')
 
 
-        # TODO: Deskew bildet
 
-        # TODO: Grayscale bildet
 
-        # TODO: Noise reduction og sharpening -> bilateral filter beholder edges
-
-        # TODO: Contrast enhancement - CLAHE
 
         # TODO: Binarize / threshold bildet -> en svart og hvit maske
+
+        #_, ocr_image = cv2.threshold()
+
 
         # TODO: Morphological cleanup -> fyll inn manglende deler av bokstaver og fjern flekker
         
 
         # TODO: Data augmentation
+
+
 
         ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
 
@@ -169,28 +187,8 @@ Crops an image to the bounding box that is provided
 def _crop_image_with_bb(image, bb):
 
     x, y, x2, y2 = map(int, bb)
-
-    # x = int(bb[0])
-    # y = int(bb[1])
-    # x2 = int(bb[2])
-    # y2  = int(bb[3])
-    # width = int(bb[2]) - int(bb[0])
-    # height = int(bb[3]) - int(bb[1])
-
-    # x2 = x + width
-    # y2 = y + height
-
-    # x, y, x2, y2 = map(int, bb)
+    
     return image[y:y2, x:x2, :]
-
-# def _crop_image_with_bb(image, bb):
-#     x = int(bb[0])
-#     y = int(bb[1])
-#     width = int(bb[2]) - int(bb[0])
-#     height = int(bb[3]) - int(bb[1])
-
-#     img_crop = F.crop(image, top=y, left=x, height=height, width=width)
-#     return img_crop
 
 '''
 Calculates the Bounding box coordinates for an image
@@ -235,8 +233,6 @@ Used for testing, mainly that the preprocessing steps keep the desired output fo
 
 '''
 if __name__ == "__main__":
-    #print(cv2.haveImageReader(".jpg")) 
-    
     label_path = "dataset/datasets/rf/ringcodes.csv"
     image_path = "dataset/datasets/rf/images"
     bb_path = "dataset/datasets/rf/labels"
