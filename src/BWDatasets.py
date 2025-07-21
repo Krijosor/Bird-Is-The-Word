@@ -48,31 +48,29 @@ class TrainDataSet(Dataset):
     def __getitem__(self, idx):
         label = self.labels[idx]
         bb_path = self.bb_paths[idx]
+        
+        # Retrieve image into a numpy array
         image = Image.open(self.img_paths[idx]).convert('RGB')
-        # image = cv2.imread(self.img_paths[idx], flags=cv2.IMREAD_COLOR_BGR)
         image = np.array(image)
         image = image[:, :, ::-1].copy()
 
-        # Make sure that the image is a tensor, and not PIL
-        # if not (isinstance(image, torch.Tensor)):
-        #     image = T.ToTensor()(image)
-        
+        # Crop image
         bb = _calculate_bb_cords(image=image, bb=_bb_txt_to_list(bb_path=bb_path)) # Retrieve bb cords directly before returning
         image = _crop_image_with_bb(image, bb)
 
-
-        # image = T.Normalize(           # ImageNet stats
-        #     mean=[0.485, 0.456, 0.406],
-        #     std=[0.229, 0.224, 0.225],
-        # )(image)
+        # Normalization with ImageNet mean and std
+        ocr_image = image.astype(np.float32) / 255.0
+        mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+        std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+        ocr_image = (ocr_image - mean) / std
 
         # Cast to numpy and change to integers
-        # image = tensor_to_numpy(image)
-        # image = (image * 255).clip(0, 255).astype('uint8')
+        # ocr_image = tensor_to_numpy(ocr_image)
+        # ocr_image = (ocr_image * 255).clip(0, 255).astype('uint8')
 
         # Convert image to OpenCV BGR format, supersample, and convert back to RGB 
-        # image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-        #image = self.upres.upsample(image)
+        # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_RGB2BGR)
+        # ocr_image = self.upres.upsample(ocr_image)
 
 
         # TODO: Deskew bildet
@@ -90,20 +88,26 @@ class TrainDataSet(Dataset):
 
         # TODO: Data augmentation
 
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
 
         # Make sure that the image is a tensor
         if not (isinstance(image, torch.Tensor)):
             image = T.ToTensor()(image)
 
+        # Make sure that the image is a tensor
+        if not (isinstance(ocr_image, torch.Tensor)):
+            ocr_image = T.ToTensor()(ocr_image)
+
         # Add transformation mask to image
         if self.transform:
             image = self.transform(image)
+            ocr_image = self.transform(ocr_image)
 
         # Convert image back to ints
         image = convert_dtype(image)
+        ocr_image = convert_dtype(ocr_image)
 
-        return image, bb, label
+        return {"ocr_image":ocr_image, "image":image, "bb":bb, "label":label}
 
 '''
 Converts the image from float values to integer values 
@@ -250,8 +254,8 @@ if __name__ == "__main__":
 
     exp_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True)
 
-    for images, bb, labels in exp_loader:
-        images = tensor_to_numpy(images)
+    for data in exp_loader:
+        images = tensor_to_numpy(data["ocr_image"])
         for image in images:
             # Some simple tests
             if image is None:
