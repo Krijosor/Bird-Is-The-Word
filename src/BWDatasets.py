@@ -60,7 +60,6 @@ class TrainDataSet(Dataset):
         ocr_image = image.astype(np.uint8)
     
         # Convert image to OpenCV BGR format and upsample to gain more detail
-        # ocr_image = (ocr_image * 255).clip(0, 255).astype('uint8')
         ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_RGB2BGR)
         ocr_image = self.upres.upsample(ocr_image)
 
@@ -82,15 +81,12 @@ class TrainDataSet(Dataset):
         # ocr_image = cv2.warpAffine(plate_roi, M, (width, height))
 
         
-        # Normalisering burde egt være før grayscale, eller basert på bildet etter grayscale
         # Normalization with ImageNet mean and std
         # ocr_image = ocr_image.astype(np.float32) / 255.0
         # mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
         # std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
         # ocr_image = (ocr_image - mean) / std
         # ocr_image = (ocr_image * 255).clip(0, 255).astype('uint8')
-
-        check_image_state(ocr_image, "before norm")
 
         # Normalization with grayscale
         ocr_image = ocr_image.astype(np.float32) / 255.0
@@ -99,31 +95,20 @@ class TrainDataSet(Dataset):
         ocr_image = (ocr_image - mean) / std
         ocr_image = (ocr_image * 255).clip(0, 255).astype('uint8')
 
-        #check_image_state(ocr_image, "after norm")
-
-
-        # TODO: Prøv contrast normalization her istedet for vanlig normalization 
+        # TODO: Contrast Normalization, men den funker ikke
         # Contrast normalization variant
         # ocr_image = cv2.normalize(src=ocr_image, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=-1, mask=None)
-        #ocr_image = cv2.normalize(src=ocr_image, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=-1, mask=None)
  
         # Adaptive Thresholding
-        # TODO: Binarize / threshold bildet -> en svart og hvit maske
-        # Vi kan bruke cv2.THRESH_BINARY eller cv2.THRESH_OTSU
-        # _, ocr_image = cv2.threshold(ocr_image, 0, 255, cv2.THRESH_OTSU)
+        ocr_image = cv2.adaptiveThreshold(src=ocr_image, maxValue=255, adaptiveMethod=cv2.ADAPTIVE_THRESH_GAUSSIAN_C, thresholdType=cv2.THRESH_BINARY, blockSize=9, C=15)
 
-        #check_image_state(ocr_image, "before adaptivethresh")
-
-        ocr_image = cv2.adaptiveThreshold(src=ocr_image,maxValue=255, adaptiveMethod=cv2.ADAPTIVE_THRESH_GAUSSIAN_C, thresholdType=cv2.THRESH_BINARY, blockSize=15, C=5)
-
-
-
-        # TODO: Morphological cleanup -> fyll inn manglende deler av bokstaver og fjern flekker
-        
+        # Morphological cleanup, requires binary mask
+        # Open
+        ocr_image = cv2.morphologyEx(ocr_image, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3)))
+        # Close
+        ocr_image = cv2.morphologyEx(ocr_image, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5,5)))
 
         # TODO: Data augmentation
-
-
 
         ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
 
