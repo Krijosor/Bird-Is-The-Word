@@ -64,21 +64,16 @@ class TrainDataSet(Dataset):
         ocr_image = self.upres.upsample(ocr_image)
 
         # Grayscaling
+        check_image_state(ocr_image, "before grey")
         ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2GRAY)
+        check_image_state(ocr_image, "after grey")
 
         # Noise reduction
-        ocr_image = cv2.bilateralFilter(ocr_image, 15, 50, 50)
+        #ocr_image = cv2.bilateralFilter(ocr_image, 15, 50, 50)
 
         # Contrast enhancement - CLAHE
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(20,20))
-        ocr_image = clahe.apply(ocr_image)
-
-        # TODO: Deskewing the image
-        # Denne må eg skrive selv visstnok :(
-        # edges = cv2.Canny(ocr_image, 50, 150)
-        # angle = calculate_angle(edges)
-        # M = cv2.getRotationMatrix2D(center, angle, 1.0)
-        # ocr_image = cv2.warpAffine(plate_roi, M, (width, height))
+        #clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(20,20))
+        #ocr_image = clahe.apply(ocr_image)
         
         # Normalization with ImageNet mean and std
         # ocr_image = ocr_image.astype(np.float32) / 255.0
@@ -88,16 +83,18 @@ class TrainDataSet(Dataset):
         # ocr_image = (ocr_image * 255).clip(0, 255).astype('uint8')
 
         # Normalization with grayscale, imagenet values
-        ocr_image = ocr_image.astype(np.float32) / 255.0
-        mean = np.array([0.449], dtype=np.float32)
-        std = np.array([0.226], dtype=np.float32)
-        ocr_image = (ocr_image - mean) / std
-        ocr_image = (ocr_image * 255).clip(0, 255).astype('uint8')
+        # ocr_image = ocr_image.astype(np.float32) / 255.0
+        # mean = np.array([0.449], dtype=np.float32)
+        # std = np.array([0.226], dtype=np.float32)
+        # ocr_image = (ocr_image - mean) / std
+        # ocr_image = (ocr_image * 255).clip(0, 255).astype('uint8')
+
+        #check_image_state(ocr_image, "before normalization")
 
         # Contrast normalization variant
         # Either use this or regular normalization
         dst = np.empty_like(ocr_image)
-        ocr_image = cv2.normalize(src=ocr_image, dst=dst, alpha=0., beta=255., norm_type=cv2.NORM_MINMAX, dtype=-1, mask=None)
+        #ocr_image = cv2.normalize(src=ocr_image, dst=dst, alpha=0., beta=255., norm_type=cv2.NORM_MINMAX, dtype=-1, mask=None)
  
         # Adaptive Thresholding
         #ocr_image = cv2.adaptiveThreshold(src=ocr_image, maxValue=255, adaptiveMethod=cv2.ADAPTIVE_THRESH_GAUSSIAN_C, thresholdType=cv2.THRESH_BINARY, blockSize=9, C=15)
@@ -110,7 +107,7 @@ class TrainDataSet(Dataset):
 
         # TODO: Data augmentation
 
-
+        #check_image_state(ocr_image, "before tensor")
 
         # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
 
@@ -130,6 +127,8 @@ class TrainDataSet(Dataset):
         # Convert image back to ints
         image = convert_dtype(image)
         ocr_image = convert_dtype(ocr_image)
+
+        #check_image_state(ocr_image, "at get")
 
         return {"ocr_image":ocr_image, "image":image, "bb":bb, "label":label}
 
@@ -221,7 +220,6 @@ def _calculate_bb_cords(image, bb):
 Used to check the state of an image during the retrieval
 '''
 def check_image_state(img, state):
-    print("-"*12)
     print(f'Checking image at state: {state}')
     print(f'Is image None: {img is None}')
     print(f'Shape: {img.shape}, Pixel Datatype: {img.dtype}')
