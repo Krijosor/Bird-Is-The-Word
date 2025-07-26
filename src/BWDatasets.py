@@ -79,7 +79,6 @@ class TrainDataSet(Dataset):
         # angle = calculate_angle(edges)
         # M = cv2.getRotationMatrix2D(center, angle, 1.0)
         # ocr_image = cv2.warpAffine(plate_roi, M, (width, height))
-
         
         # Normalization with ImageNet mean and std
         # ocr_image = ocr_image.astype(np.float32) / 255.0
@@ -88,39 +87,42 @@ class TrainDataSet(Dataset):
         # ocr_image = (ocr_image - mean) / std
         # ocr_image = (ocr_image * 255).clip(0, 255).astype('uint8')
 
-        # Normalization with grayscale
+        # Normalization with grayscale, imagenet values
         ocr_image = ocr_image.astype(np.float32) / 255.0
         mean = np.array([0.449], dtype=np.float32)
         std = np.array([0.226], dtype=np.float32)
         ocr_image = (ocr_image - mean) / std
         ocr_image = (ocr_image * 255).clip(0, 255).astype('uint8')
 
-        # TODO: Contrast Normalization, men den funker ikke
         # Contrast normalization variant
-        # ocr_image = cv2.normalize(src=ocr_image, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=-1, mask=None)
+        # Either use this or regular normalization
+        dst = np.empty_like(ocr_image)
+        ocr_image = cv2.normalize(src=ocr_image, dst=dst, alpha=0., beta=255., norm_type=cv2.NORM_MINMAX, dtype=-1, mask=None)
  
         # Adaptive Thresholding
-        ocr_image = cv2.adaptiveThreshold(src=ocr_image, maxValue=255, adaptiveMethod=cv2.ADAPTIVE_THRESH_GAUSSIAN_C, thresholdType=cv2.THRESH_BINARY, blockSize=9, C=15)
+        #ocr_image = cv2.adaptiveThreshold(src=ocr_image, maxValue=255, adaptiveMethod=cv2.ADAPTIVE_THRESH_GAUSSIAN_C, thresholdType=cv2.THRESH_BINARY, blockSize=9, C=15)
 
         # Morphological cleanup, requires binary mask
         # Open
-        ocr_image = cv2.morphologyEx(ocr_image, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3)))
+        #ocr_image = cv2.morphologyEx(ocr_image, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3)))
         # Close
-        ocr_image = cv2.morphologyEx(ocr_image, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5,5)))
+        #ocr_image = cv2.morphologyEx(ocr_image, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5,5)))
 
         # TODO: Data augmentation
 
-        ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
+
+
+        # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
 
         # Make sure that the image is a tensor
         if not (isinstance(image, torch.Tensor)):
             image = T.ToTensor()(image)
 
-        # Make sure that the image is a tensor
+        # Make sure that the ocr image is a tensor
         if not (isinstance(ocr_image, torch.Tensor)):
             ocr_image = T.ToTensor()(ocr_image)
 
-        # Add transformation mask to image
+        # Add transformation mask to images
         if self.transform:
             image = self.transform(image)
             ocr_image = self.transform(ocr_image)
@@ -176,22 +178,17 @@ Converts a txt file containing the bounding boxes to a ring
 -------- Helper Function --------
 '''
 def _bb_txt_to_list(bb_path):
-
     with open(bb_path) as f:
         line = f.readline().strip()
         bb = line.split(' ')
-    
     return bb
-
 
 '''
 Crops an image to the bounding box that is provided
 -------- Helper function --------
 '''
 def _crop_image_with_bb(image, bb):
-
     x, y, x2, y2 = map(int, bb)
-    
     return image[y:y2, x:x2, :]
 
 '''
