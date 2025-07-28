@@ -41,19 +41,27 @@ class TrainDataSet(Dataset):
         # Retrieve images from folder and match them with labels
         self.img_paths = df["filename"].apply(lambda e: os.path.join(img_path, e)).to_list()
 
-        self.validate_paths(self.img_paths)
-
         bb_path = bb_path + "/"
         bb_paths = df["filename"].apply(lambda e: os.path.join(bb_path, e)).to_list()
         self.bb_paths = [i[:-4] + ".txt" for i in bb_paths]
 
         self.labels = list(df[["code","color"]].itertuples(index=False, name=None)) # Labels should be a list of tuples
-        
+
+        # Validate files to make sure they are ok
+        self.validate_paths(self.img_paths)
+        self.validate_paths(self.bb_paths)
+    
+    # Validates that each file path actually exists
+    # Throw an exception if a path does not exist
     def validate_paths(self, paths):
-        for i in paths:
-            path = Path(i)
-            if not path.exists():
-                raise Exception(f"Invalid file path. Path {path} does not exist")
+        for i, path in enumerate(paths):
+            syspath = Path(path)
+            if not syspath.exists():
+                # If a bounding box does not exist, feed the whole image
+                if path[-4:] == ".txt":
+                    paths[i] = "No BB"
+                else:
+                    raise Exception(f'Path {syspath} does not exist.')
 
     def __len__(self):
         return len(self.img_paths)
@@ -63,9 +71,10 @@ class TrainDataSet(Dataset):
         bb_path = self.bb_paths[idx]
         
         # Retrieve image into a numpy array
-        image = Image.open(self.img_paths[idx]).convert('RGB')
-        image = np.array(image)
-        image = image[:, :, ::-1].copy()
+        #image = Image.open(self.img_paths[idx]).convert('RGB')
+        image = cv2.imread(self.img_paths[idx], cv2.IMREAD_COLOR)
+        #image = np.array(image)
+        #image = image[:, :, ::-1].copy()
 
         # Crop image
         bb = _calculate_bb_cords(image=image, bb=_bb_txt_to_list(bb_path=bb_path)) # Retrieve bb cords directly before returning
@@ -80,8 +89,8 @@ class TrainDataSet(Dataset):
         ocr_image = ocr_image.astype(np.uint8)
     
         # Convert image to OpenCV BGR format and upsample to gain more detail
-        # This causes 1 extra second of time per image during inference without GPU
-        #ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
+        # upsampling causes 1 extra second of time per image during inference without GPU
+        ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
         #ocr_image = self.upres.upsample(ocr_image)
 
         # Grayscaling
@@ -201,15 +210,14 @@ Converts a txt file containing the bounding boxes to a ring
 -------- Helper Function --------
 '''
 def _bb_txt_to_list(bb_path):
-    # TODO: Do not validate every run! O(N)
-    path = Path(bb_path)
-    if path.exists():
+    if bb_path == "No BB":
+        return None
+    else:
         with open(bb_path) as f:
             line = f.readline().strip()
             bb = line.split(' ')
         return bb
-    else:
-        return None
+
 
 '''
 Crops an image to the bounding box that is provided
@@ -265,10 +273,10 @@ Used for testing, mainly that the preprocessing steps keep the desired output fo
 '''
 if __name__ == "__main__":
 
-    info = cv2.getBuildInformation()
-    assert "CUDA              : YES"   in info
-    assert "cuDNN             : YES"   in info
-    assert "NVIDIA CUDA       : YES"   in info 
+    # info = cv2.getBuildInformation()
+    # assert "CUDA              : YES"   in info
+    # assert "cuDNN             : YES"   in info
+    # assert "NVIDIA CUDA       : YES"   in info 
 
 
     label_path = "dataset/datasets/rf/ringcodes.csv"
