@@ -21,9 +21,13 @@ class TrainDataSet(Dataset):
         self.img_path = img_path
         self.transform = transform
         self.max_n = max_n
+
+        # Retrieve upsampler and set to GPU if available
         self.upres = cv2.dnn_superres.DnnSuperResImpl.create()
         self.upres.readModel('src/upsampling/EDSR_x4.pb')
         self.upres.setModel('edsr', 4)
+        self.upres.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+        self.upres.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
 
         # Retrieve labels and sort them in alphabetical order to match the images
         df = pd.read_csv(labels_path, sep="|")
@@ -56,31 +60,35 @@ class TrainDataSet(Dataset):
 
         # Crop image
         bb = _calculate_bb_cords(image=image, bb=_bb_txt_to_list(bb_path=bb_path)) # Retrieve bb cords directly before returning
-        image = _crop_image_with_bb(image, bb)
-        ocr_image = image.astype(np.uint8)
+        ocr_image = _crop_image_with_bb(image, bb)
+        ocr_image = ocr_image.astype(np.uint8)
     
         # Convert image to OpenCV BGR format and upsample to gain more detail
-        ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_RGB2BGR)
-        ocr_image = self.upres.upsample(ocr_image)
+        # This causes 1 extra second of time per image during inference without GPU
+        #ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
+        #ocr_image = self.upres.upsample(ocr_image)
 
         # Grayscaling
-        check_image_state(ocr_image, "before grey")
-        ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2GRAY)
-        check_image_state(ocr_image, "after grey")
+        # check_image_state(ocr_image, "before grey")
+        # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_RGB2GRAY)
+        # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
+        # check_image_state(ocr_image, "after grey")
 
         # Noise reduction
-        #ocr_image = cv2.bilateralFilter(ocr_image, 15, 50, 50)
+        # ocr_image = cv2.bilateralFilter(ocr_image, 15, 50, 50)
 
         # Contrast enhancement - CLAHE
-        #clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(20,20))
-        #ocr_image = clahe.apply(ocr_image)
+        # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(20,20))
+        # ocr_image = clahe.apply(ocr_image)
         
         # Normalization with ImageNet mean and std
-        # ocr_image = ocr_image.astype(np.float32) / 255.0
-        # mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-        # std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-        # ocr_image = (ocr_image - mean) / std
-        # ocr_image = (ocr_image * 255).clip(0, 255).astype('uint8')
+        ocr_image = ocr_image.astype(np.float32) / 255.0
+        mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+        std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+        ocr_image = (ocr_image - mean) / std
+        ocr_image = (ocr_image * 255).clip(0, 255).astype('uint8')
+
+        # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_RGB2GRAY)
 
         # Normalization with grayscale, imagenet values
         # ocr_image = ocr_image.astype(np.float32) / 255.0
@@ -89,27 +97,27 @@ class TrainDataSet(Dataset):
         # ocr_image = (ocr_image - mean) / std
         # ocr_image = (ocr_image * 255).clip(0, 255).astype('uint8')
 
-        #check_image_state(ocr_image, "before normalization")
+        # check_image_state(ocr_image, "before normalization")
 
         # Contrast normalization variant
         # Either use this or regular normalization
-        dst = np.empty_like(ocr_image)
-        #ocr_image = cv2.normalize(src=ocr_image, dst=dst, alpha=0., beta=255., norm_type=cv2.NORM_MINMAX, dtype=-1, mask=None)
+        # dst = np.empty_like(ocr_image)
+        # ocr_image = cv2.normalize(src=ocr_image, dst=dst, alpha=0., beta=255., norm_type=cv2.NORM_MINMAX, dtype=-1, mask=None)
  
         # Adaptive Thresholding
-        #ocr_image = cv2.adaptiveThreshold(src=ocr_image, maxValue=255, adaptiveMethod=cv2.ADAPTIVE_THRESH_GAUSSIAN_C, thresholdType=cv2.THRESH_BINARY, blockSize=9, C=15)
+        # ocr_image = cv2.adaptiveThreshold(src=ocr_image, maxValue=255, adaptiveMethod=cv2.ADAPTIVE_THRESH_GAUSSIAN_C, thresholdType=cv2.THRESH_BINARY, blockSize=9, C=15)
 
         # Morphological cleanup, requires binary mask
         # Open
-        #ocr_image = cv2.morphologyEx(ocr_image, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3)))
+        # ocr_image = cv2.morphologyEx(ocr_image, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3)))
         # Close
-        #ocr_image = cv2.morphologyEx(ocr_image, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5,5)))
+        # ocr_image = cv2.morphologyEx(ocr_image, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5,5)))
 
         # TODO: Data augmentation
 
-        #check_image_state(ocr_image, "before tensor")
+        # check_image_state(ocr_image, "before tensor")
 
-        # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
+        # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_GRAY2RGB)
 
         # Make sure that the image is a tensor
         if not (isinstance(image, torch.Tensor)):
@@ -128,7 +136,7 @@ class TrainDataSet(Dataset):
         image = convert_dtype(image)
         ocr_image = convert_dtype(ocr_image)
 
-        #check_image_state(ocr_image, "at get")
+        # check_image_state(ocr_image, "at get")
 
         return {"ocr_image":ocr_image, "image":image, "bb":bb, "label":label}
 
@@ -232,6 +240,13 @@ Used for testing, mainly that the preprocessing steps keep the desired output fo
 
 '''
 if __name__ == "__main__":
+
+    info = cv2.getBuildInformation()
+    assert "CUDA              : YES"   in info
+    assert "cuDNN             : YES"   in info
+    assert "NVIDIA CUDA       : YES"   in info 
+
+
     label_path = "dataset/datasets/rf/ringcodes.csv"
     image_path = "dataset/datasets/rf/images"
     bb_path = "dataset/datasets/rf/labels"
