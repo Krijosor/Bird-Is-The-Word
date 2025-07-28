@@ -201,6 +201,7 @@ Converts a txt file containing the bounding boxes to a ring
 -------- Helper Function --------
 '''
 def _bb_txt_to_list(bb_path):
+    # TODO: Do not validate every run! O(N)
     path = Path(bb_path)
     if path.exists():
         with open(bb_path) as f:
