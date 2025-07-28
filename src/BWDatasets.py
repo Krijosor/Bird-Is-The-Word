@@ -71,10 +71,7 @@ class TrainDataSet(Dataset):
         bb_path = self.bb_paths[idx]
         
         # Retrieve image into a numpy array
-        #image = Image.open(self.img_paths[idx]).convert('RGB')
         image = cv2.imread(self.img_paths[idx], cv2.IMREAD_COLOR)
-        #image = np.array(image)
-        #image = image[:, :, ::-1].copy()
 
         # Crop image
         bb = _calculate_bb_cords(image=image, bb=_bb_txt_to_list(bb_path=bb_path)) # Retrieve bb cords directly before returning
@@ -86,15 +83,14 @@ class TrainDataSet(Dataset):
             ocr_image = image
             bb = np.empty_like(ocr_image) # Dummy variable
         
-        ocr_image = ocr_image.astype(np.uint8)
+        ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
     
         # Convert image to OpenCV BGR format and upsample to gain more detail
         # upsampling causes 1 extra second of time per image during inference without GPU
-        ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
-        #ocr_image = self.upres.upsample(ocr_image)
+        
+        # ocr_image = self.upres.upsample(ocr_image)
 
         # Grayscaling
-        # check_image_state(ocr_image, "before grey")
         # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_RGB2GRAY)
         # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
         # check_image_state(ocr_image, "after grey")
@@ -107,11 +103,11 @@ class TrainDataSet(Dataset):
         # ocr_image = clahe.apply(ocr_image)
         
         # Normalization with ImageNet mean and std
-        ocr_image = ocr_image.astype(np.float32) / 255.0
-        mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-        std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-        ocr_image = (ocr_image - mean) / std
-        ocr_image = (ocr_image * 255).clip(0, 255).astype('uint8')
+        # ocr_image = ocr_image.astype(np.float32) / 255.0
+        # mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+        # std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+        # ocr_image = (ocr_image - mean) / std
+        # ocr_image = (ocr_image * 255).clip(0, 255).astype('uint8')
 
         # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_RGB2GRAY)
 
@@ -160,8 +156,6 @@ class TrainDataSet(Dataset):
         # Convert image back to ints
         image = convert_dtype(image)
         ocr_image = convert_dtype(ocr_image)
-
-        # check_image_state(ocr_image, "at get")
 
         return {"ocr_image":ocr_image, "image":image, "label":label}
 
