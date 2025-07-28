@@ -6,6 +6,7 @@ import torchvision.transforms as T
 import pandas as pd
 from PIL import Image
 import os
+from pathlib import Path
 import cv2
 import cv2.dnn_superres
 
@@ -60,7 +61,14 @@ class TrainDataSet(Dataset):
 
         # Crop image
         bb = _calculate_bb_cords(image=image, bb=_bb_txt_to_list(bb_path=bb_path)) # Retrieve bb cords directly before returning
-        ocr_image = _crop_image_with_bb(image, bb)
+
+        # If there is no bounding box then the whole image is processed
+        if bb is not None:
+            ocr_image = _crop_image_with_bb(image, bb)
+        else:
+            ocr_image = image
+            bb = np.empty_like(ocr_image) # Dummy variable
+        
         ocr_image = ocr_image.astype(np.uint8)
     
         # Convert image to OpenCV BGR format and upsample to gain more detail
@@ -138,7 +146,7 @@ class TrainDataSet(Dataset):
 
         # check_image_state(ocr_image, "at get")
 
-        return {"ocr_image":ocr_image, "image":image, "bb":bb, "label":label}
+        return {"ocr_image":ocr_image, "image":image, "label":label}
 
 '''
 Converts the image from float values to integer values 
@@ -185,10 +193,14 @@ Converts a txt file containing the bounding boxes to a ring
 -------- Helper Function --------
 '''
 def _bb_txt_to_list(bb_path):
-    with open(bb_path) as f:
-        line = f.readline().strip()
-        bb = line.split(' ')
-    return bb
+    path = Path(bb_path)
+    if path.exists():
+        with open(bb_path) as f:
+            line = f.readline().strip()
+            bb = line.split(' ')
+        return bb
+    else:
+        return None
 
 '''
 Crops an image to the bounding box that is provided
@@ -205,6 +217,9 @@ Calculates the Bounding box coordinates for an image
 -------- Helper Function --------
 '''
 def _calculate_bb_cords(image, bb):
+    # If bounding box does not exist, exit
+    if bb is None:
+        return None
 
     img_H, img_W, _ = image.shape
 
