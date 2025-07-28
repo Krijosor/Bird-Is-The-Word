@@ -41,12 +41,20 @@ class TrainDataSet(Dataset):
         # Retrieve images from folder and match them with labels
         self.img_paths = df["filename"].apply(lambda e: os.path.join(img_path, e)).to_list()
 
+        self.validate_paths(self.img_paths)
+
         bb_path = bb_path + "/"
         bb_paths = df["filename"].apply(lambda e: os.path.join(bb_path, e)).to_list()
         self.bb_paths = [i[:-4] + ".txt" for i in bb_paths]
 
         self.labels = list(df[["code","color"]].itertuples(index=False, name=None)) # Labels should be a list of tuples
         
+    def validate_paths(self, paths):
+        for i in paths:
+            path = Path(i)
+            if not path.exists():
+                raise Exception(f"Invalid file path. Path {path} does not exist")
+
     def __len__(self):
         return len(self.img_paths)
 
