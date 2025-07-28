@@ -39,11 +39,9 @@ class TrainDataSet(Dataset):
             df = df[:self.max_n]
         
         # Retrieve images from folder and match them with labels
-        self.img_paths = df["filename"].apply(lambda e: os.path.join(img_path, e)).to_list()
+        self.img_paths = df["filename"].apply(lambda filename: os.path.join(img_path, filename)).to_list()
 
-        bb_path = bb_path + "/"
-        bb_paths = df["filename"].apply(lambda e: os.path.join(bb_path, e)).to_list()
-        self.bb_paths = [i[:-4] + ".txt" for i in bb_paths]
+        self.bb_paths = df["filename"].apply(lambda filename: os.path.join(bb_path, filename[:-4] + ".txt")).to_list()
 
         self.labels = list(df[["code","color"]].itertuples(index=False, name=None)) # Labels should be a list of tuples
 
@@ -74,14 +72,15 @@ class TrainDataSet(Dataset):
         image = cv2.imread(self.img_paths[idx], cv2.IMREAD_COLOR)
 
         # Crop image
-        bb = _calculate_bb_cords(image=image, bb=_bb_txt_to_list(bb_path=bb_path)) # Retrieve bb cords directly before returning
+        bb = _bb_txt_to_list(bb_path=bb_path) #TODO: Move to __init__ 
+        bb_cords = _calculate_bb_cords(image=image, bb=bb) # Retrieve bb cords directly before returning
 
         # If there is no bounding box then the whole image is processed
-        if bb is not None:
-            ocr_image = _crop_image_with_bb(image, bb)
+        if bb_cords is not None:
+            ocr_image = _crop_image_with_bb(image, bb_cords)
         else:
             ocr_image = image
-            bb = np.empty_like(ocr_image) # Dummy variable
+            bb_cords = np.empty_like(ocr_image) # Dummy variable
         
         ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
         # Convert image to OpenCV BGR format and upsample to gain more detail
@@ -211,7 +210,6 @@ def _bb_txt_to_list(bb_path):
             bb = line.split(' ')
         return bb
 
-
 '''
 Crops an image to the bounding box that is provided
 -------- Helper function --------
@@ -292,7 +290,7 @@ if __name__ == "__main__":
     for data in exp_loader:
         images = tensor_to_numpy(data["ocr_image"])
         for image in images:
-            # Some simple tests
+            # Some simple tests to ensure image correctness
             if image is None:
                 print("Image is None!")
             elif image.dtype.name == 'float32':
