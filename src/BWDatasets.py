@@ -84,7 +84,6 @@ class TrainDataSet(Dataset):
             bb = np.empty_like(ocr_image) # Dummy variable
         
         ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
-    
         # Convert image to OpenCV BGR format and upsample to gain more detail
         # upsampling causes 1 extra second of time per image during inference without GPU
         
@@ -219,7 +218,7 @@ Crops an image to the bounding box that is provided
 '''
 def _crop_image_with_bb(image, bb):
     x, y, x2, y2 = map(int, bb)
-    return image[y:y2, x:x2, :]
+    return image[y:y2, x:x2].copy()
 
 '''
 Calculates the Bounding box coordinates for an image
@@ -243,10 +242,10 @@ def _calculate_bb_cords(image, bb):
     bb_h = (img_H * float(bb[4])) / 2
 
     # Calculate corners of bb
-    min_x = max(0, bb_x - (bb_w))
-    max_x = min(img_W, bb_x + (bb_w))
-    min_y = max(0, bb_y - (bb_h))
-    max_y = min(img_H, bb_y + (bb_h))
+    min_x = max(0, int(bb_x - (bb_w)))
+    max_x = min(img_W, int(bb_x + (bb_w)))
+    min_y = max(0, bb_y - int((bb_h)))
+    max_y = min(img_H, bb_y + int((bb_h)))
 
     return min_x, min_y, max_x, max_y
 
