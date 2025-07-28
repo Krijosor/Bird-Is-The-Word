@@ -3,6 +3,7 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader 
 from torchvision.transforms import functional as F
 import torchvision.transforms as T
+from torchvision.io import decode_image
 import pandas as pd
 from PIL import Image
 import os
@@ -53,7 +54,7 @@ class TrainDataSet(Dataset):
         self.bb_cords = []
         for bb, img in zip(self.bb_paths, self.img_paths):
             box = _bb_txt_to_list(bb_path=bb)
-            image = cv2.imread(img, cv2.IMREAD_COLOR)
+            image = decode_image(img)
             self.bb_cords.append(_calculate_bb_cords(image=image, bb=box))
     
     # Validates that each file path actually exists
@@ -75,7 +76,7 @@ class TrainDataSet(Dataset):
         label = self.labels[idx]
         
         # Retrieve image into a numpy array
-        image = cv2.imread(self.img_paths[idx], cv2.IMREAD_COLOR)
+        image = decode_image(self.img_paths[idx])
 
         # Retrieve boundng box coordinates and Crop image
         bb_cords = self.bb_cords[idx]
@@ -85,8 +86,10 @@ class TrainDataSet(Dataset):
             ocr_image = _crop_image_with_bb(image, bb_cords)
         else:
             ocr_image = image
-            bb_cords = np.empty_like(ocr_image) # Dummy variable
-        
+
+        # Convert to numpy
+        ocr_image = tensor_to_numpy(ocr_image)   
+
         ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
         # Convert image to OpenCV BGR format and upsample to gain more detail
         # upsampling causes 1 extra second of time per image during inference without GPU
@@ -221,7 +224,7 @@ Crops an image to the bounding box that is provided
 '''
 def _crop_image_with_bb(image, bb):
     x, y, x2, y2 = map(int, bb)
-    return image[y:y2, x:x2].copy()
+    return image[:, y:y2, x:x2]
 
 '''
 Calculates the Bounding box coordinates for an image
@@ -234,7 +237,8 @@ def _calculate_bb_cords(image, bb):
     if bb is None:
         return None
 
-    img_H, img_W, _ = image.shape
+    # img_H, img_W, _ = image.shape
+    _, img_H, img_W= image.shape
 
     # Calculate x and y coordinates of the bb
     bb_x = img_W * float(bb[1])
