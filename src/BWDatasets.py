@@ -48,6 +48,11 @@ class TrainDataSet(Dataset):
         # Validate files to make sure they are ok
         self.validate_paths(self.img_paths)
         self.validate_paths(self.bb_paths)
+
+        self.bounding_boxes = []
+
+        for box in self.bb_paths:
+            self.bounding_boxes.append(_bb_txt_to_list(bb_path=box))
     
     # Validates that each file path actually exists
     # Throw an exception if a path does not exist
@@ -66,13 +71,12 @@ class TrainDataSet(Dataset):
 
     def __getitem__(self, idx):
         label = self.labels[idx]
-        bb_path = self.bb_paths[idx]
         
         # Retrieve image into a numpy array
         image = cv2.imread(self.img_paths[idx], cv2.IMREAD_COLOR)
 
         # Crop image
-        bb = _bb_txt_to_list(bb_path=bb_path) #TODO: Move to __init__ 
+        bb = self.bounding_boxes[idx]
         bb_cords = _calculate_bb_cords(image=image, bb=bb) # Retrieve bb cords directly before returning
 
         # If there is no bounding box then the whole image is processed
