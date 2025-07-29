@@ -44,7 +44,7 @@ class TrainDataSet(Dataset):
 
         self.bb_paths = df["filename"].apply(lambda filename: os.path.join(bb_path, filename[:-4] + ".txt")).to_list()
 
-        self.labels = list(df[["code","color"]].itertuples(index=False, name=None)) # Labels should be a list of tuples
+        self.labels = list(df[["code","color"]].itertuples(index=False, name=None)) # Labels are a list of tuples
 
         # Validate files to make sure they are ok
         self.validate_paths(self.img_paths)
@@ -160,7 +160,7 @@ class TrainDataSet(Dataset):
             ocr_image = self.transform(ocr_image)
 
         # Convert image back to ints
-        image = convert_dtype(image)
+        #image = convert_dtype(image)
         ocr_image = convert_dtype(ocr_image)
 
         return {"ocr_image":ocr_image, "image":image, "label":label}
