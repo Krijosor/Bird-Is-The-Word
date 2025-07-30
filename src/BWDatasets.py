@@ -11,6 +11,8 @@ from pathlib import Path
 import cv2
 import cv2.dnn_superres
 
+from . import dfmaker
+
 '''
 Images that go into dataset are retrieved from the given folder and converted to PIL images. 
 These are then converted to tensors.
@@ -19,8 +21,7 @@ Then image is upsampled using opencv2's superresolution module EDSR_x4
 Then transform is applied.
 '''
 class TrainDataSet(Dataset):
-    def __init__(self, img_path:str, labels_path:str, bb_path: str, transform=None, max_n=None):
-        self.img_path = img_path
+    def __init__(self, df:pd.DataFrame, transform=None, max_n=None):
         self.transform = transform
         self.max_n = max_n
 
@@ -32,23 +33,27 @@ class TrainDataSet(Dataset):
         self.upres.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
 
         # Retrieve labels and sort them in alphabetical order to match the images
-        df = pd.read_csv(labels_path, sep="|")
-        df = df.sort_values("filename", ascending=True).reset_index(drop=True)
+        # df = pd.read_csv(labels_path, sep="|")
+        # df = df.sort_values("filename", ascending=True).reset_index(drop=True)
 
-        # Ensure the data contains the chosen amount of elements
-        if max_n is not None:
-            df = df[:self.max_n]
+        # # Ensure the data contains the chosen amount of elements
+        # if max_n is not None:
+        #     df = df[:self.max_n]
         
-        # Retrieve images from folder and match them with labels
-        self.img_paths = df["filename"].apply(lambda filename: os.path.join(img_path, filename)).to_list()
+        # # Retrieve images from folder and match them with labels
+        # self.img_paths = df["filename"].apply(lambda filename: os.path.join(img_path, filename)).to_list()
 
-        self.bb_paths = df["filename"].apply(lambda filename: os.path.join(bb_path, filename[:-4] + ".txt")).to_list()
+        # self.bb_paths = df["filename"].apply(lambda filename: os.path.join(bb_path, filename[:-4] + ".txt")).to_list()
 
-        self.labels = list(df[["code","color"]].itertuples(index=False, name=None)) # Labels are a list of tuples
+        # self.labels = list(df[["code","color"]].itertuples(index=False, name=None)) # Labels are a list of tuples
 
-        # Validate files to make sure they are ok
-        self.validate_paths(self.img_paths)
-        self.validate_paths(self.bb_paths)
+        # # Validate files to make sure they are ok
+        # self.validate_paths(self.img_paths)
+        # self.validate_paths(self.bb_paths)
+
+        self.img_paths = df['img_paths'].tolist()
+        self.bb_paths = df['bb_paths'].tolist()
+        self.labels = df['labels'].tolist()
 
         # Pre-Calculate bounding box coordinates
         self.bb_cords = []
@@ -292,7 +297,9 @@ if __name__ == "__main__":
         
     ])
 
-    train_dataset = TrainDataSet(img_path=image_path, labels_path=label_path, bb_path=bb_path, transform=transform, max_n=max_n)
+    df = dfmaker.make_dataframe(img_path=image_path, labels_path=label_path, bb_path=bb_path, max_n=max_n)
+
+    train_dataset = TrainDataSet(df=df,transform=transform, max_n=max_n)
 
     exp_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True)
 
