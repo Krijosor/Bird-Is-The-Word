@@ -52,23 +52,23 @@ def finalize_image(image, transform=None) -> np.ndarray:
 Initializes the bilateral filter
 '''
 def init_bilateral_filter():
-    cv2.createTrackbar("bl_d", "tune", 5, 9, update)
-    cv2.createTrackbar("bl_sigmaColor", "tune",  20, 150, update)
-    cv2.createTrackbar("bl_sigmaSpace", "tune",  20, 150, update)
+    cv2.createTrackbar("bl_d", "tuned", 5, 15, update)
+    cv2.createTrackbar("bl_sigmaColor", "tuned", 50, 150, update)
+    cv2.createTrackbar("bl_sigmaSpace", "tuned",  50, 150, update)
     
 '''
 Function used to apply the Bilateral Filter
 '''
 def bilateral_filter(image):
     # d = 0 crashes often
-    d=cv2.getTrackbarPos('bl_d', 'tune')
+    d=cv2.getTrackbarPos('bl_d', 'tuned')
     if d == 0:
         d=1
 
     image = cv2.bilateralFilter(src=image, 
                                 d=d, 
-                                sigmaColor=cv2.getTrackbarPos('bl_sigmaColor', 'tune'), 
-                                sigmaSpace=cv2.getTrackbarPos('bl_sigmaSpace', 'tune'),
+                                sigmaColor=cv2.getTrackbarPos('bl_sigmaColor', 'tuned'), 
+                                sigmaSpace=cv2.getTrackbarPos('bl_sigmaSpace', 'tuned'),
                                 borderType=cv2.BORDER_DEFAULT)
     #bilat_values = [cv2.BORDER_WRAP, cv2.BORDER_DEFAULT, cv2.BORDER_TRANSPARENT, cv2.BORDER_ISOLATED]
     # image = cv2.bilateralFilter(image, cv2.getTrackbarPos('bl_blockSize', 'tune'), cv2.getTrackbarPos('bl_C', 'tune'), cv2.getTrackbarPos('bl_kernelSize', 'tune'))
@@ -79,26 +79,30 @@ Contains the application that we will use to change the images
 '''
 def application(dataset):
     # Extract preselected images
-    image = dataset[max_n_single]['ocr_image']
+    image = dataset[max_n_single+1]['ocr_image']
 
+    # Init image display windows
     img_W, img_H, _ = image.shape
-
-    cv2.namedWindow("tune", cv2.WINDOW_NORMAL)
-    cv2.resizeWindow('tune', 2*img_H, 2*img_W)
+    cv2.namedWindow("tuned", cv2.WINDOW_NORMAL)
+    cv2.resizeWindow('tuned', 2*img_W, 2*img_H)
+    cv2.namedWindow("regular", cv2.WINDOW_NORMAL)
+    cv2.resizeWindow('regular', 2*img_W, 2*img_H)
+    cv2.moveWindow('tuned', 100, 100)
+    cv2.moveWindow('regular', 600, 100)
+    
+    # Init the filters
     init_bilateral_filter()
 
-    
-
+    # Application start
     while True:
         # Apply filters
         filtered_image = bilateral_filter(image)
 
-        filtered_image = finalize_image(filtered_image)
-
         # Display Image
-        cv2.imshow(winname="tune", mat=filtered_image)
+        cv2.imshow(winname="tuned", mat=finalize_image(filtered_image, transform=transform))
+        cv2.imshow(winname="regular", mat=finalize_image(image, transform=transform))
 
-        # Exit with ESC key
+        # Exit the application with ESC key
         if cv2.waitKey(1) & 0xFF == 27:
             break
     

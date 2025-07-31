@@ -10,7 +10,8 @@ import os
 from pathlib import Path
 import cv2
 import cv2.dnn_superres
-import dfmaker
+from src import dfmaker
+# import dfmaker
 
 '''
 Images that go into dataset are retrieved from the given folder and converted to PIL images. 
@@ -68,10 +69,10 @@ class TrainDataSet(Dataset):
         # Convert image to OpenCV BGR format and upsample to gain more detail
         # upsampling causes 1 extra second of time per image during inference without GPU
         
-        # ocr_image = self.upres.upsample(ocr_image)
+        ocr_image = self.upres.upsample(ocr_image)
 
         # Noise reduction
-        # ocr_image = cv2.bilateralFilter(ocr_image, 15, 50, 50)
+        ocr_image = cv2.bilateralFilter(ocr_image, 9, 47, 75)
 
         # Contrast enhancement - CLAHE
         # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(20,20))
