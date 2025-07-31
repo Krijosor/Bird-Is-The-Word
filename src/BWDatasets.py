@@ -10,8 +10,7 @@ import os
 from pathlib import Path
 import cv2
 import cv2.dnn_superres
-
-from . import dfmaker
+import dfmaker
 
 '''
 Images that go into dataset are retrieved from the given folder and converted to PIL images. 
@@ -144,8 +143,7 @@ class TrainDataSet(Dataset):
 Copy of TrainDataset used to find good values for the preprocessing filters
 '''
 class TestDataSet(Dataset):
-    def __init__(self, df:pd.DataFrame, transform=None, max_n=None):
-        self.transform = transform
+    def __init__(self, df:pd.DataFrame, max_n=None):
         self.max_n = max_n
 
         # Retrieve upsampler and set to GPU if available
