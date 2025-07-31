@@ -32,25 +32,7 @@ class TrainDataSet(Dataset):
         self.upres.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
         self.upres.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
 
-        # Retrieve labels and sort them in alphabetical order to match the images
-        # df = pd.read_csv(labels_path, sep="|")
-        # df = df.sort_values("filename", ascending=True).reset_index(drop=True)
-
-        # # Ensure the data contains the chosen amount of elements
-        # if max_n is not None:
-        #     df = df[:self.max_n]
-        
-        # # Retrieve images from folder and match them with labels
-        # self.img_paths = df["filename"].apply(lambda filename: os.path.join(img_path, filename)).to_list()
-
-        # self.bb_paths = df["filename"].apply(lambda filename: os.path.join(bb_path, filename[:-4] + ".txt")).to_list()
-
-        # self.labels = list(df[["code","color"]].itertuples(index=False, name=None)) # Labels are a list of tuples
-
-        # # Validate files to make sure they are ok
-        # self.validate_paths(self.img_paths)
-        # self.validate_paths(self.bb_paths)
-
+        # Extract dataframe data
         self.img_paths = df['img_paths'].tolist()
         self.bb_paths = df['bb_paths'].tolist()
         self.labels = df['labels'].tolist()
@@ -62,18 +44,6 @@ class TrainDataSet(Dataset):
             image = decode_image(img)
             self.bb_cords.append(_calculate_bb_cords(image=image, bb=box))
     
-    # Validates that each file path actually exists
-    # Throw an exception if a path does not exist
-    def validate_paths(self, paths):
-        for i, path in enumerate(paths):
-            syspath = Path(path)
-            if not syspath.exists():
-                # If a bounding box does not exist, feed the whole image
-                if path[-4:] == ".txt":
-                    paths[i] = "No BB"
-                else:
-                    raise Exception(f'Path {syspath} does not exist.')
-
     def __len__(self):
         return len(self.img_paths)
 
@@ -101,17 +71,17 @@ class TrainDataSet(Dataset):
         
         # ocr_image = self.upres.upsample(ocr_image)
 
-        # Grayscaling
-        # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_RGB2GRAY)
-        # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
-        # check_image_state(ocr_image, "after grey")
-
         # Noise reduction
         # ocr_image = cv2.bilateralFilter(ocr_image, 15, 50, 50)
 
         # Contrast enhancement - CLAHE
         # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(20,20))
         # ocr_image = clahe.apply(ocr_image)
+
+        # Grayscaling
+        # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_RGB2GRAY)
+        # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
+        # check_image_state(ocr_image, "after grey")
         
         # Normalization with ImageNet mean and std
         # ocr_image = ocr_image.astype(np.float32) / 255.0
@@ -165,10 +135,60 @@ class TrainDataSet(Dataset):
             ocr_image = self.transform(ocr_image)
 
         # Convert image back to ints
-        #image = convert_dtype(image)
+        image = convert_dtype(image)
         ocr_image = convert_dtype(ocr_image)
 
         return {"ocr_image":ocr_image, "image":image, "label":label}
+
+'''
+Copy of TrainDataset used to find good values for the preprocessing filters
+'''
+class TestDataSet(Dataset):
+    def __init__(self, df:pd.DataFrame, transform=None, max_n=None):
+        self.transform = transform
+        self.max_n = max_n
+
+        # Retrieve upsampler and set to GPU if available
+        self.upres = cv2.dnn_superres.DnnSuperResImpl.create()
+        self.upres.readModel('src/upsampling/EDSR_x4.pb')
+        self.upres.setModel('edsr', 4)
+        self.upres.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+        self.upres.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
+
+        # Extract dataframe data
+        self.img_paths = df['img_paths'].tolist()
+        self.bb_paths = df['bb_paths'].tolist()
+        self.labels = df['labels'].tolist()
+
+        # Pre-Calculate bounding box coordinates
+        self.bb_cords = []
+        for bb, img in zip(self.bb_paths, self.img_paths):
+            box = _bb_txt_to_list(bb_path=bb)
+            image = decode_image(img)
+            self.bb_cords.append(_calculate_bb_cords(image=image, bb=box))
+    
+    def __len__(self):
+        return len(self.img_paths)
+
+    def __getitem__(self, idx):
+        label = self.labels[idx]
+        
+        # Retrieve image into a numpy array
+        image = decode_image(self.img_paths[idx])
+
+        # Retrieve boundng box coordinates and Crop image
+        bb_cords = self.bb_cords[idx]
+
+        # If there is no bounding box then the whole image is processed
+        if bb_cords is not None:
+            image = _crop_image_with_bb(image, bb_cords)
+
+        # Convert to numpy, BGR2RGB and upsample
+        image = tensor_to_numpy(image)   
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = self.upres.upsample(image)
+
+        return {"ocr_image":image, "label":label}
 
 '''
 Converts the image from float values to integer values 
@@ -197,17 +217,17 @@ def tensor_to_numpy(img_tensor:torch.Tensor):
     
     return img_np.numpy()
 
-'''
-Opens a single image so that it can easily be converted into
-a format that can go into the PaddleOCR model
-'''
-def open_image(filepath):
-    image = Image.open(filepath).convert('RGB')
-    func = T.PILToTensor()
-    image = func(image)
-    # TODO: Add preprocessing steps
-    image = tensor_to_numpy(image)
-    return image
+# '''
+# Opens a single image so that it can easily be converted into
+# a format that can go into the PaddleOCR model
+# '''
+# def open_image(filepath):
+#     image = Image.open(filepath).convert('RGB')
+#     func = T.PILToTensor()
+#     image = func(image)
+#     # TODO: Add preprocessing steps
+#     image = tensor_to_numpy(image)
+#     return image
 
 '''
 Converts a txt file containing the bounding boxes to a ring
@@ -215,7 +235,7 @@ Converts a txt file containing the bounding boxes to a ring
 -------- Helper Function --------
 '''
 def _bb_txt_to_list(bb_path):
-    if bb_path == "No BB":
+    if bb_path == "No BB Found":
         return None
     else:
         with open(bb_path) as f:
