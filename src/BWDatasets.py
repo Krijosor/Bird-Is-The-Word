@@ -11,7 +11,7 @@ from pathlib import Path
 import cv2
 import cv2.dnn_superres
 from src import dfmaker
-# import dfmaker
+#import dfmaker
 
 '''
 Images that go into dataset are retrieved from the given folder and converted to PIL images. 
@@ -65,11 +65,15 @@ class TrainDataSet(Dataset):
         # Convert to numpy
         ocr_image = tensor_to_numpy(ocr_image)   
 
-        ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
         # Convert image to OpenCV BGR format and upsample to gain more detail
         # upsampling causes 1 extra second of time per image during inference without GPU
-        
-        ocr_image = self.upres.upsample(ocr_image)
+        # check_image_state(ocr_image, "before upsample")
+
+        img_W, img_H, _ = ocr_image.shape
+        if img_W < 1000 and img_H < 800:
+            ocr_image = self.upres.upsample(ocr_image)
+
+        ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
 
         # Noise reduction
         ocr_image = cv2.bilateralFilter(ocr_image, 9, 47, 75)
@@ -135,10 +139,11 @@ class TrainDataSet(Dataset):
             ocr_image = self.transform(ocr_image)
 
         # Convert image back to ints
-        image = convert_dtype(image)
         ocr_image = convert_dtype(ocr_image)
 
-        return {"ocr_image":ocr_image, "image":image, "label":label}
+        bb = self.bb_cords[idx]
+
+        return {"ocr_image":ocr_image,'bb':bb, "image":image, "label":label}
 
 '''
 Copy of TrainDataset used to find good values for the preprocessing filters
@@ -215,18 +220,6 @@ def tensor_to_numpy(img_tensor:torch.Tensor):
         return img_np.permute(1, 2, 0).numpy()
     
     return img_np.numpy()
-
-# '''
-# Opens a single image so that it can easily be converted into
-# a format that can go into the PaddleOCR model
-# '''
-# def open_image(filepath):
-#     image = Image.open(filepath).convert('RGB')
-#     func = T.PILToTensor()
-#     image = func(image)
-#     # TODO: Add preprocessing steps
-#     image = tensor_to_numpy(image)
-#     return image
 
 '''
 Converts a txt file containing the bounding boxes to a ring

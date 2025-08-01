@@ -21,13 +21,15 @@ import dfmaker
 '''
 Necessary variables
 '''
-
+# Upsampler
 upres = cv2.dnn_superres.DnnSuperResImpl.create()
 upres.readModel('src/upsampling/EDSR_x4.pb')
 upres.setModel('edsr', 4)
 upres.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
 upres.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
 
+# Contrast Enhancer
+clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(20,20))
 
 '''
 Makes an image ready for the pipeline
@@ -72,6 +74,21 @@ def bilateral_filter(image):
                                 borderType=cv2.BORDER_DEFAULT)
     #bilat_values = [cv2.BORDER_WRAP, cv2.BORDER_DEFAULT, cv2.BORDER_TRANSPARENT, cv2.BORDER_ISOLATED]
     # image = cv2.bilateralFilter(image, cv2.getTrackbarPos('bl_blockSize', 'tune'), cv2.getTrackbarPos('bl_C', 'tune'), cv2.getTrackbarPos('bl_kernelSize', 'tune'))
+    return image
+
+'''
+
+'''
+# def init_contrast_enchancement():
+#     clahe.setClipLimit(clipLimit)
+#     clahe.setTilesGridSize(gridSize)
+'''
+Function used to apply the Contrast Enhancement Filter
+'''
+def contrast_enhancement(image, clipLimit:int, gridSize):
+    clahe.setClipLimit(clipLimit)
+    clahe.setTilesGridSize(gridSize)
+    image = clahe.apply(image)
     return image
 
 '''
