@@ -10,8 +10,8 @@ import os
 from pathlib import Path
 import cv2
 import cv2.dnn_superres
-from src import dfmaker
-#import dfmaker
+#from src import dfmaker
+import dfmaker
 
 '''
 Images that go into dataset are retrieved from the given folder and converted to PIL images. 
@@ -107,7 +107,7 @@ class TrainDataSet(Dataset):
 
         # Contrast normalization variant
         # Either use this or regular normalization
-        # dst = np.empty_like(ocr_image)
+        # dst = np.zeros_like(ocr_image)
         # ocr_image = cv2.normalize(src=ocr_image, dst=dst, alpha=0., beta=255., norm_type=cv2.NORM_MINMAX, dtype=-1, mask=None)
  
         # Adaptive Thresholding
@@ -141,9 +141,9 @@ class TrainDataSet(Dataset):
         # Convert image back to ints
         ocr_image = convert_dtype(ocr_image)
 
-        bb = self.bb_cords[idx]
+        #bb = self.bb_cords[idx]
 
-        return {"ocr_image":ocr_image,'bb':bb, "image":image, "label":label}
+        return {"ocr_image":ocr_image, "image":image, "label":label}
 
 '''
 Copy of TrainDataset used to find good values for the preprocessing filters
