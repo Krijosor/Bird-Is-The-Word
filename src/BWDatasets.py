@@ -59,19 +59,14 @@ class TrainDataSet(Dataset):
         else:
             ocr_image = image
 
-        # Convert to numpy
-         
-        # Convert image to OpenCV BGR format and upsample to gain more detail
-        # upsampling causes 1 extra second of time per image during inference without GPU
-        # check_image_state(ocr_image, "before upsample")
-
+        # Upsample image if it is not too large already
         img_W, img_H, _ = ocr_image.shape
         if img_W < 1000 and img_H < 800:
-            ocr_image = ocr_image.to(device=device).float()
+            ocr_image = ocr_image.to(device=device).float() / 255.
             ocr_image = ocr_image.unsqueeze(0)
             ocr_image = Fnn.interpolate(ocr_image, scale_factor=4.0, mode='bicubic', align_corners=False)
             ocr_image = ocr_image.squeeze(0)
-            ocr_image = ocr_image.cpu()
+            ocr_image = convert_dtype(ocr_image).cpu()
 
         ocr_image = tensor_to_numpy(ocr_image)  
 
