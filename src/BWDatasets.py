@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from torch.utils.data import Dataset, DataLoader 
 from torchvision.transforms import functional as F
+import torch.nn.functional as Fnn
 import torchvision.transforms as T
 from torchvision.io import decode_image
 import pandas as pd
@@ -9,9 +10,10 @@ from PIL import Image
 import os
 from pathlib import Path
 import cv2
-import cv2.dnn_superres
-#from src import dfmaker
-import dfmaker
+from src import dfmaker
+#import dfmaker
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 '''
 Images that go into dataset are retrieved from the given folder and converted to PIL images. 
@@ -24,13 +26,8 @@ class TrainDataSet(Dataset):
     def __init__(self, df:pd.DataFrame, transform=None, max_n=None):
         self.transform = transform
         self.max_n = max_n
-
         # Retrieve upsampler and set to GPU if available
-        self.upres = cv2.dnn_superres.DnnSuperResImpl.create()
-        self.upres.readModel('src/upsampling/EDSR_x4.pb')
-        self.upres.setModel('edsr', 4)
-        self.upres.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
-        self.upres.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
+
 
         # Extract dataframe data
         self.img_paths = df['img_paths'].tolist()
@@ -63,20 +60,25 @@ class TrainDataSet(Dataset):
             ocr_image = image
 
         # Convert to numpy
-        ocr_image = tensor_to_numpy(ocr_image)   
-
+         
         # Convert image to OpenCV BGR format and upsample to gain more detail
         # upsampling causes 1 extra second of time per image during inference without GPU
         # check_image_state(ocr_image, "before upsample")
 
         img_W, img_H, _ = ocr_image.shape
         if img_W < 1000 and img_H < 800:
-            ocr_image = self.upres.upsample(ocr_image)
+            ocr_image = ocr_image.to(device=device).float()
+            ocr_image = ocr_image.unsqueeze(0)
+            ocr_image = Fnn.interpolate(ocr_image, scale_factor=4.0, mode='bicubic', align_corners=False)
+            ocr_image = ocr_image.squeeze(0)
+            ocr_image = ocr_image.cpu()
 
-        ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
+        ocr_image = tensor_to_numpy(ocr_image)  
 
-        # Noise reduction
-        ocr_image = cv2.bilateralFilter(ocr_image, 9, 47, 75)
+        # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
+
+        # # Noise reduction
+        # ocr_image = cv2.bilateralFilter(ocr_image, 9, 47, 75)
 
         # Contrast enhancement - CLAHE
         # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(20,20))
@@ -141,9 +143,10 @@ class TrainDataSet(Dataset):
         # Convert image back to ints
         ocr_image = convert_dtype(ocr_image)
 
-        #bb = self.bb_cords[idx]
+        # #bb = self.bb_cords[idx]
 
         return {"ocr_image":ocr_image, "image":image, "label":label}
+
 
 '''
 Copy of TrainDataset used to find good values for the preprocessing filters
@@ -290,12 +293,6 @@ Used for testing, mainly that the preprocessing steps keep the desired output fo
 '''
 if __name__ == "__main__":
 
-    # info = cv2.getBuildInformation()
-    # assert "CUDA              : YES"   in info
-    # assert "cuDNN             : YES"   in info
-    # assert "NVIDIA CUDA       : YES"   in info 
-
-
     label_path = "dataset/datasets/rf/ringcodes.csv"
     image_path = "dataset/datasets/rf/images"
     bb_path = "dataset/datasets/rf/labels"
@@ -316,8 +313,9 @@ if __name__ == "__main__":
     exp_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True)
 
     for data in exp_loader:
-        images = tensor_to_numpy(data["ocr_image"])
+        images = data["ocr_image"]
         for image in images:
+            image = tensor_to_numpy(image)
             # Some simple tests to ensure image correctness
             if image is None:
                 print("Image is None!")
