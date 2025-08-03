@@ -26,8 +26,7 @@ class TrainDataSet(Dataset):
     def __init__(self, df:pd.DataFrame, transform=None, max_n=None):
         self.transform = transform
         self.max_n = max_n
-        # Retrieve upsampler and set to GPU if available
-
+        self.clahe = cv2.createCLAHE(clipLimit=15.0, tileGridSize=(7,7))
 
         # Extract dataframe data
         self.img_paths = df['img_paths'].tolist()
@@ -70,17 +69,14 @@ class TrainDataSet(Dataset):
 
         ocr_image = tensor_to_numpy(ocr_image)  
 
-        # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
+        #ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_RGB2GRAY)
 
-        # # Noise reduction
-        # ocr_image = cv2.bilateralFilter(ocr_image, 9, 47, 75)
+        # Noise reduction
+        #ocr_image = cv2.bilateralFilter(ocr_image, 20, 50, 50, borderType=cv2.BORDER_DEFAULT)
 
-        # Contrast enhancement - CLAHE
-        # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(20,20))
-        # ocr_image = clahe.apply(ocr_image)
+        ocr_image = cv2.fastNlMeansDenoisingColored(ocr_image, None, 10, 10, 7, 15)
 
         # Grayscaling
-        # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_RGB2GRAY)
         # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
         # check_image_state(ocr_image, "after grey")
         
@@ -120,7 +116,7 @@ class TrainDataSet(Dataset):
 
         # check_image_state(ocr_image, "before tensor")
 
-        # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_GRAY2RGB)
+        #ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_GRAY2RGB)
 
         # Make sure that the image is a tensor
         if not (isinstance(image, torch.Tensor)):
@@ -150,13 +146,6 @@ class TestDataSet(Dataset):
     def __init__(self, df:pd.DataFrame, max_n=None):
         self.max_n = max_n
 
-        # Retrieve upsampler and set to GPU if available
-        self.upres = cv2.dnn_superres.DnnSuperResImpl.create()
-        self.upres.readModel('src/upsampling/EDSR_x4.pb')
-        self.upres.setModel('edsr', 4)
-        self.upres.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
-        self.upres.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
-
         # Extract dataframe data
         self.img_paths = df['img_paths'].tolist()
         self.bb_paths = df['bb_paths'].tolist()
@@ -185,10 +174,18 @@ class TestDataSet(Dataset):
         if bb_cords is not None:
             image = _crop_image_with_bb(image, bb_cords)
 
-        # Convert to numpy, BGR2RGB and upsample
+        # Upsample
+        img_W, img_H, _ = image.shape
+        if img_W < 1000 and img_H < 800:
+            image = image.to(device=device).float() / 255.
+            image = image.unsqueeze(0)
+            image = Fnn.interpolate(image, scale_factor=4.0, mode='bicubic', align_corners=False)
+            image = image.squeeze(0)
+            image = convert_dtype(image).cpu()
+
+        # Convert to numpy, BGR2RGB
         image = tensor_to_numpy(image)   
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image = self.upres.upsample(image)
 
         return {"ocr_image":image, "label":label}
 
