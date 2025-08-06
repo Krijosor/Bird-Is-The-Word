@@ -74,7 +74,7 @@ class TrainDataSet(Dataset):
         # Noise reduction
         #ocr_image = cv2.bilateralFilter(ocr_image, 20, 50, 50, borderType=cv2.BORDER_DEFAULT)
 
-        ocr_image = cv2.fastNlMeansDenoisingColored(ocr_image, None, 10, 10, 7, 15)
+        #ocr_image = cv2.fastNlMeansDenoisingColored(ocr_image, None, 10, 10, 7, 15)
 
         # Grayscaling
         # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
@@ -134,7 +134,7 @@ class TrainDataSet(Dataset):
         # Convert image back to ints
         ocr_image = convert_dtype(ocr_image)
 
-        # #bb = self.bb_cords[idx]
+        # bb = self.bb_cords[idx]
 
         return {"ocr_image":ocr_image, "image":image, "label":label}
 
@@ -256,9 +256,10 @@ def _calculate_bb_cords(image, bb):
     bb_x = img_W * float(bb[1])
     bb_y = img_H * float(bb[2])
 
-    # Calculate height and width of the bb, and divide by 2
-    bb_w = (img_W * float(bb[3])) / 2
-    bb_h = (img_H * float(bb[4])) / 2
+    # Calculate height and width of the bb, and divide by 1.75
+    # We divide by 1.75 and not 2 to account for some error in bb placement
+    bb_w = (img_W * float(bb[3])) / 1.75
+    bb_h = (img_H * float(bb[4])) / 1.75
 
     # Calculate corners of bb
     min_x = max(0, int(bb_x - (bb_w)))

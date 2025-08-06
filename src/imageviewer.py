@@ -23,20 +23,15 @@ upres.setModel('edsr', 4)
 upres.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
 upres.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
 
-# Bilateral Filter Variables
-bilat_values = [cv2.BORDER_WRAP, cv2.BORDER_DEFAULT, cv2.BORDER_ISOLATED]
-
 # Contrast Enhancer Variables
 clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(20,20))
 
 # Adaptive Thresholding Variables
-adaptive_bsizes = [1, 3, 5, 7, 9, 11, 13, 15]
-adaptive_method = [cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.ADAPTIVE_THRESH_MEAN_C]
-adaptive_thresh_type = [cv2.THRESH_BINARY, cv2.THRESH_BINARY_INV]
+adaptive_bsizes = [3, 5, 7, 9, 11]
 
 # Morphological Cleanup Variables
 mc_shape = [cv2.MORPH_RECT, cv2.MORPH_CROSS, cv2.MORPH_ELLIPSE]
-mc_kernel_size = [1, 3, 5, 7, 9, 11, 13, 15]
+mc_kernel_size = [3, 5, 7, 9, 11, 13, 15]
 
 '''
 Makes an image ready for the pipeline
@@ -61,10 +56,9 @@ def finalize_image(image, transform=None) -> np.ndarray:
 Initializes the bilateral filter
 '''
 def init_bilateral_filter():
-    cv2.createTrackbar("bl_d", "tuned", 5, 24, update)
-    cv2.createTrackbar("bl_sigmaColor", "tuned", 50, 150, update)
-    cv2.createTrackbar("bl_sigmaSpace", "tuned",  50, 150, update)
-    cv2.createTrackbar("bl_borderType", "tuned",  0, len(bilat_values) - 1, update)
+    cv2.createTrackbar("bl_d", "tuned", 12, 24, update)
+    cv2.createTrackbar("bl_sigmaColor", "tuned", 50, 100, update)
+    cv2.createTrackbar("bl_sigmaSpace", "tuned",  50, 80, update)
 
     cv2.setTrackbarMin('bl_d', 'tuned', 1)
     cv2.setTrackbarMin('bl_sigmaColor', 'tuned', 1)
@@ -74,20 +68,19 @@ def init_bilateral_filter():
 Apply the Bilateral Filter to an image
 '''
 def bilateral_filter(image):
-    btype = bilat_values[cv2.getTrackbarPos('bl_borderType', 'tuned')]
     image = cv2.bilateralFilter(src=image, 
                                 d=cv2.getTrackbarPos('bl_d', 'tuned'), 
                                 sigmaColor=cv2.getTrackbarPos('bl_sigmaColor', 'tuned'), 
                                 sigmaSpace=cv2.getTrackbarPos('bl_sigmaSpace', 'tuned'),
-                                borderType=btype)
+                                borderType=cv2.BORDER_DEFAULT)
     return image
 
 '''
 Initializes the Contrast Enhancement
 '''
 def init_contrast_enchancement():
-    cv2.createTrackbar('ce_limit', 'tuned', 2, 40, update)
-    cv2.createTrackbar('ce_size', 'tuned', 4, 20, update)
+    cv2.createTrackbar('ce_limit', 'tuned', 2, 30, update)
+    cv2.createTrackbar('ce_size', 'tuned', 4, 12, update)
 
     cv2.setTrackbarMin('ce_limit', 'tuned', 1)
     cv2.setTrackbarMin('ce_size', 'tuned', 2)
@@ -96,10 +89,15 @@ def init_contrast_enchancement():
 Apply the Contrast Enhancement Filter to an image
 '''
 def contrast_enhancement(image):
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+
     clahe.setClipLimit(float(cv2.getTrackbarPos('ce_limit', 'tuned')))
     clahe.setTilesGridSize((cv2.getTrackbarPos('ce_size', 'tuned'), cv2.getTrackbarPos('ce_size', 'tuned')))
-    image = clahe.apply(image)
-    return image
+    l2 = clahe.apply(l)
+
+    filtered_image = cv2.merge((l2, a, b))
+    return cv2.cvtColor(filtered_image, cv2.COLOR_LAB2BGR)
 
 '''
 Apply gray scale filter to image
@@ -135,7 +133,8 @@ Cv2.MinMax is the only norm type used
 '''
 def init_contrast_normalization():
     cv2.createTrackbar('cn_alpha', 'tuned', 20, 30, update)
-    cv2.createTrackbar('cn_beta', 'tuned', 0, 20, update)
+    cv2.createTrackbar('cn_beta', 'tuned', 0, 10, update)
+
     cv2.setTrackbarMin('cn_alpha', 'tuned', 2)
 
 '''
@@ -145,17 +144,17 @@ def contrast_normalization(image):
     dst = np.zeros_like(image)
     alpha = float(cv2.getTrackbarPos('cn_alpha', 'tuned')) / 20.
     beta = float(cv2.getTrackbarPos('cn_beta', 'tuned')) / 20.
-    image = cv2.normalize(src=image, dst=dst, alpha=alpha, beta=beta, norm_type=cv2.NORM_MINMAX, dtype=1, mask=None)
+    #image = cv2.normalize(src=image, dst=dst, alpha=alpha, beta=beta, norm_type=cv2.NORM_MINMAX, dtype=1, mask=None)
+    image = cv2.normalize(image, dst, 0.0, 255.0, cv2.NORM_MINMAX)
+    #image = (image * 255).astype("uint8")
     return image
 
 '''
 Initialize Adaptive Thresholding
 '''
 def init_adaptive_thresholding():
-    cv2.createTrackbar('at_method', 'tuned', 0, len(adaptive_method) - 1, update)
-    cv2.createTrackbar('at_threshType', 'tuned', 0, len(adaptive_thresh_type) - 1, update)
-    cv2.createTrackbar('at_bsize', 'tuned', 1, len(adaptive_bsizes) - 1, update)
-    cv2.createTrackbar('at_c', 'tuned', 10, 30, update)
+    cv2.createTrackbar('at_bsize', 'tuned', 2, len(adaptive_bsizes) - 1, update)
+    cv2.createTrackbar('at_c', 'tuned', 15, 30, update)
 
     cv2.setTrackbarMin('at_bsize', 'tuned', 1)
     cv2.setTrackbarMin('at_c', 'tuned', 1)
@@ -165,11 +164,9 @@ Apply Adaptive Thresholding to an image
 '''
 def adaptive_thresholding(image):
     bsize = adaptive_bsizes[cv2.getTrackbarPos('at_bsize', 'tuned')]
-    method = adaptive_method[cv2.getTrackbarPos('at_method', 'tuned')]
-    threshtype = adaptive_thresh_type[cv2.getTrackbarPos('at_threshType', 'tuned')]
     image = cv2.adaptiveThreshold(src=image, maxValue=255, 
-                                  adaptiveMethod=method, 
-                                  thresholdType=threshtype, 
+                                  adaptiveMethod=cv2.ADAPTIVE_THRESH_MEAN_C, 
+                                  thresholdType=cv2.THRESH_BINARY, 
                                   blockSize=bsize, 
                                   C=cv2.getTrackbarPos('at_c', 'tuned'))
     return image
@@ -212,31 +209,31 @@ def apply_filters(image):
 
     #filtered_image = grayscale(filtered_image)
 
-    filtered_image = bilateral_filter(filtered_image)
+    #filtered_image = bilateral_filter(filtered_image)
 
-    lab = cv2.cvtColor(filtered_image, cv2.COLOR_BGR2LAB)
+    #filtered_image = cv2.distanceTransform(filtered_image, cv2.DIST_L2, 5)
 
-    l, a, b = cv2.split(lab)
+    #filtered_image = cv2.normalize(filtered_image, np.zeros_like(filtered_image), 0, 255, cv2.NORM_MINMAX)
+    #filtered_image = filtered_image.astype(np.uint8)
 
-    l2 = contrast_enhancement(l)
 
-    filtered_image = cv2.merge((l2, a, b))
+    #filtered_image = (filtered_image * 255).astype(np.uint8)
 
-    filtered_image = cv2.cvtColor(filtered_image, cv2.COLOR_LAB2BGR)
+    #filtered_image = contrast_enhancement(filtered_image)
 
-    filtered_image = grayscale(filtered_image)
+    #filtered_image = grayscale(filtered_image)
 
     # filtered_image = standardization_1d(filtered_image)
     
     # filtered_image = standardization_3d(filtered_image)
 
-    filtered_image = contrast_normalization(filtered_image)
+    #filtered_image = contrast_normalization(filtered_image)
 
-    filtered_image = (np.clip(filtered_image, 0.0, 1.0) * 255).astype(np.uint8)
+    #filtered_image = (np.clip(filtered_image, 0.0, 1.0) * 255).astype(np.uint8)
 
-    filtered_image = morphological_cleanup(filtered_image)
+    #filtered_image = morphological_cleanup(filtered_image)
 
-    filtered_image = adaptive_thresholding(filtered_image)
+    #filtered_image = adaptive_thresholding(filtered_image)
 
     return filtered_image
 
@@ -250,18 +247,18 @@ def application(dataset):
     # Init image display windows
     img_W, img_H, _ = image.shape
     cv2.namedWindow("tuned", cv2.WINDOW_NORMAL)
-    cv2.resizeWindow('tuned', 2*img_W, 2*img_H)
+    cv2.resizeWindow('tuned', 2*img_W, 3*img_H)
     cv2.namedWindow("regular", cv2.WINDOW_NORMAL)
     cv2.resizeWindow('regular', 2*img_W, 2*img_H)
     cv2.moveWindow('tuned', 100, 100)
     cv2.moveWindow('regular', 600, 100)
     
     # Init the filters
-    init_bilateral_filter()
-    init_contrast_enchancement()
-    init_contrast_normalization()
-    init_adaptive_thresholding()
-    init_morphological_cleanup()
+    #init_bilateral_filter()
+    #init_contrast_enchancement()
+    #init_contrast_normalization()
+    #init_adaptive_thresholding()
+    #init_morphological_cleanup()
 
     # Application start
     while True:
@@ -270,7 +267,7 @@ def application(dataset):
 
         # Display Image
         cv2.imshow(winname="tuned", mat=finalize_image(filtered_image, transform=transform))
-        cv2.imshow(winname="regular", mat=finalize_image(filtered_image, transform=transform))
+        cv2.imshow(winname="regular", mat=finalize_image(image, transform=transform))
 
         # Exit the application with ESC key
         if cv2.waitKey(1) & 0xFF == 27:
