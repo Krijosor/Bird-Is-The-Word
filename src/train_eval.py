@@ -44,3 +44,8 @@ def evaluate_model(preds, labels):
     fbeta = FBetaScore(task='binary', beta=0.5)
     acc = Accuracy(task='binary')
     return {"F1 Score": fbeta(preds_tensor, labels_tensor), "Accuracy": acc(preds_tensor, labels_tensor)}
+
+
+
+
+
