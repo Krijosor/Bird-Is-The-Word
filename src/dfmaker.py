@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 import pandas as pd
 
+SEED = 115
+
 '''
 Makes a dataframe 
 
@@ -46,15 +48,19 @@ Combines multiple dataframes into a single dataframe.
 
 Args:
     df_list (list[pd.DataFrame]): A list of pandas dataframes
+    shuffled (bool): If true it randomly shuffles the dataframe 
 
 Returns:
     a sorted dataframe containing all the dataframes in the list
 '''
-def combine_dfs(df_list:list[pd.DataFrame]) -> pd.DataFrame:
+def combine_dfs(df_list:list[pd.DataFrame], shuffled:bool=False) -> pd.DataFrame:
     complete_df = pd.DataFrame(columns=['filename', 'img_paths', 'bb_paths'])
 
     for df in df_list:
         complete_df = pd.concat([complete_df, df], ignore_index=True, axis=0)
+
+    if shuffled:
+        return complete_df.sample(frac=1, random_state=SEED).reset_index(drop=True)
 
     return complete_df.sort_values("filename", ascending=True).reset_index(drop=True)
 
@@ -107,7 +113,7 @@ if __name__ == '__main__':
     df_rf = make_dataframe(img_path=image_path_rf, labels_path=label_path_rf, bb_path=bb_path_rf, max_n=None)
     df_rno = make_dataframe(img_path=image_path_rno, labels_path=label_path_rno, bb_path=bb_path_rno, max_n=100)
 
-    combined_df = combine_dfs([df_lyng, df_rf, df_rno])
+    combined_df = combine_dfs([df_lyng, df_rf, df_rno], shuffled=False)
 
     lyn_len = len(df_lyng)
     rf_len = len(df_rf)
@@ -118,5 +124,4 @@ if __name__ == '__main__':
         print('All Good')
     else:
         print('Lengths are dissimiliar')
-
 

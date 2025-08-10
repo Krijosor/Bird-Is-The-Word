@@ -13,6 +13,65 @@ from src import dfmaker
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 '''
+Creates a new dataset for model training.
+The dataset follows the PaddlePaddle format
+'''
+def create_train_dataset(df:pd.DataFrame, filtering:bool, transform=None):
+    img_paths = df['img_paths'].tolist()
+    bb_paths = df['bb_paths'].tolist()
+    labels = df['labels'].tolist()
+
+    # Pre-Calculate bounding box coordinates
+    bb_cords = []
+    for bb, img in zip(bb_paths, img_paths):
+        box = _bb_txt_to_list(bb_path=bb)
+        image = decode_image(img)
+        bb_cords.append(_calculate_bb_cords(image=image, bb=box))
+
+    for idx in range(len(images)):
+
+        label = labels[idx]
+        
+        # Retrieve image into a numpy array
+        image = decode_image(img_paths[idx])
+
+        # Retrieve boundng box coordinates and Crop image
+        bb_cords = bb_cords[idx]
+
+        # If there is no bounding box then the whole image is processed
+        if bb_cords is not None:
+            image = _crop_image_with_bb(image, bb_cords)
+
+        # Upsample if the image is not too large already
+        img_W, img_H, _ = image.shape
+        if img_W < 1000 and img_H < 800:
+            image = image.to(device=device).float() / 255.
+            image = image.unsqueeze(0)
+            image = Fnn.interpolate(image, scale_factor=4.0, mode='bicubic', align_corners=False)
+            image = image.squeeze(0)
+            image = convert_dtype(image).cpu()
+
+        # Convert to numpy, BGR2RGB
+        image = tensor_to_numpy(image)   
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        if filtering:
+        # Pre-processing steps with cv2
+            pass
+        
+        # Apply transform
+        if transform:
+            image = transform(image)
+
+        # Make sure that the image is a tensor
+        if not (isinstance(image, torch.Tensor)):
+            image = T.ToTensor()(image)
+
+        image = convert_dtype(image)
+
+        # Add processed image and label to new folder with processed images
+
+'''
 Images that go into dataset are retrieved from the given folder and converted to PIL images. 
 These are then converted to tensors.
 Then cropped by the Bounding Box coordinates.
@@ -66,12 +125,12 @@ class TrainDataSet(Dataset):
 
         ocr_image = tensor_to_numpy(ocr_image)  
 
-        #ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_RGB2GRAY)
+        # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_RGB2GRAY)
 
         # Noise reduction
-        #ocr_image = cv2.bilateralFilter(ocr_image, 20, 50, 50, borderType=cv2.BORDER_DEFAULT)
+        # ocr_image = cv2.bilateralFilter(ocr_image, 20, 50, 50, borderType=cv2.BORDER_DEFAULT)
 
-        #ocr_image = cv2.fastNlMeansDenoisingColored(ocr_image, None, 10, 10, 7, 15)
+        # ocr_image = cv2.fastNlMeansDenoisingColored(ocr_image, None, 10, 10, 7, 15)
 
         # Grayscaling
         # ocr_image = cv2.cvtColor(ocr_image, cv2.COLOR_BGR2RGB)
@@ -135,11 +194,10 @@ class TrainDataSet(Dataset):
 
         return {"ocr_image":ocr_image, "image":image, "label":label}
 
-
 '''
 Copy of TrainDataset used to find good values for the preprocessing filters
 '''
-class TestDataSet(Dataset):
+class InferenceDataSet(Dataset):
     def __init__(self, df:pd.DataFrame, max_n=None):
         self.max_n = max_n
 
@@ -171,7 +229,7 @@ class TestDataSet(Dataset):
         if bb_cords is not None:
             image = _crop_image_with_bb(image, bb_cords)
 
-        # Upsample
+        # Upsample if the image is not too large already
         img_W, img_H, _ = image.shape
         if img_W < 1000 and img_H < 800:
             image = image.to(device=device).float() / 255.
