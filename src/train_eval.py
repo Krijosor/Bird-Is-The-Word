@@ -43,7 +43,16 @@ def evaluate_model(preds, labels):
     preds_tensor, labels_tensor = torch.tensor(bin_preds), torch.tensor(bin_labels)
     fbeta = FBetaScore(task='binary', beta=0.5)
     acc = Accuracy(task='binary')
-    return {"F1 Score": fbeta(preds_tensor, labels_tensor), "Accuracy": acc(preds_tensor, labels_tensor)}
+
+    preds_not_found = sum([int(pred == "Not Found") for pred in preds])
+    preds_correct = sum(bin_preds)
+    preds_wrong = len(preds) - preds_correct - preds_not_found
+
+    return {"F1 Score": fbeta(preds_tensor, labels_tensor), 
+            "Accuracy": acc(preds_tensor, labels_tensor),
+            "Not Found": preds_not_found,
+            "Wrong": preds_wrong,
+            "Correct":preds_correct}
 
 
 

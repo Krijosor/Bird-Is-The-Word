@@ -17,26 +17,21 @@ Creates a new dataset for model training.
 The dataset follows the PaddlePaddle format
 '''
 def create_train_dataset(df:pd.DataFrame, filtering:bool, transform=None):
+    # Retrieve data from dataframe
     img_paths = df['img_paths'].tolist()
     bb_paths = df['bb_paths'].tolist()
     labels = df['labels'].tolist()
 
-    # Pre-Calculate bounding box coordinates
-    bb_cords = []
-    for bb, img in zip(bb_paths, img_paths):
-        box = _bb_txt_to_list(bb_path=bb)
-        image = decode_image(img)
-        bb_cords.append(_calculate_bb_cords(image=image, bb=box))
-
-    for idx in range(len(images)):
+    # Loop over all data and create a new dataset
+    for idx in range(len(df)):
 
         label = labels[idx]
-        
-        # Retrieve image into a numpy array
+    
+        # Retrieve image into a tensor
         image = decode_image(img_paths[idx])
 
-        # Retrieve boundng box coordinates and Crop image
-        bb_cords = bb_cords[idx]
+        # Crop image with the bounding box
+        bb_cords = _calculate_bb_cords(image=image, bb=_bb_txt_to_list(bb_path=bb_paths[idx]))
 
         # If there is no bounding box then the whole image is processed
         if bb_cords is not None:
