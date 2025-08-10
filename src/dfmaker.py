@@ -12,7 +12,7 @@ Args:
     labels_path (str): the relative system path leading to the labels for the images
         - should be in a csv file separated by '|'
     bb_path (str): the relative system path leading to the bounding box coordinates contained within the images
-    max_n (int | None): Option to set a limit on how many elements are added to the dataframe. Set max_n=None for all elements to be added.
+    max_n (int | None): Option to set a limit on how many elements are added to the dataframe. Set max_n=None for all elements to be added. Default is None.
 
 Returns:
     pd.DataFrame: a sorted pandas dataframe containing the columns:
@@ -21,7 +21,7 @@ Returns:
         "bb_paths"  -> path to the file containing the bounding boxes,
         "labels"    -> a tuple containing the code and color of the birds bracelet
 '''
-def make_dataframe(img_path:str, labels_path:str, bb_path: str, max_n:int | None) -> pd.DataFrame:
+def make_dataframe(img_path:str, labels_path:str, bb_path: str, max_n:int | None=None) -> pd.DataFrame:
 
     df = pd.read_csv(labels_path, sep="|")
     df = df.sort_values("filename", ascending=True).reset_index(drop=True)
@@ -87,11 +87,11 @@ def validate_path(path:str) -> str:
             path = "No BB Found"
         else:
             raise Exception(f'Path {syspath} does not exist.')
-        
+
     return path
 
 if __name__ == '__main__':
-    
+
     # Simple check for file
 
     # Lyngøy
